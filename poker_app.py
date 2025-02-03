@@ -71,6 +71,15 @@ class Player:
         self.discount_factor = 0.9
         self.position = None  # Will be set by the game
         
+        # Initialize game sequence tracking
+        self.game_sequence = {
+            'hands_played': 0,
+            'total_chip_diff': 0,
+            'win_streak': 0,
+            'max_chips': self.chips,  # Initialize with starting chips
+            'learning_steps': 0
+        }
+        
         # Carrega Q-table existente se for uma máquina
         if self.is_machine:
             self.q_table = self.load_q_table()
@@ -130,25 +139,57 @@ class Player:
                     straight_high = values_with_low_ace[i+4]
                     break
         
-        # Verifica flush
+        # Verifica flush e straight flush
+        flush_suit = None
         flush = False
         for suit in Card.suits:
             suited_cards = [card for card in all_cards if card.suit == suit]
             if len(suited_cards) >= 5:
                 flush = True
+                flush_suit = suit
+                # Verifica Royal Flush
+                royal_values = {'10', 'J', 'Q', 'K', 'A'}
+                royal_cards = [card for card in suited_cards if card.rank in royal_values]
+                if len(royal_cards) == 5:
+                    return "Royal Flush", 1000  # Valor alto para garantir que vence todas as outras mãos
                 break
-        
+
+        # Verifica straight flush
+        if flush:
+            suited_cards = sorted([card for card in all_cards if card.suit == flush_suit], key=lambda x: x.value)
+            if len(suited_cards) >= 5:  # Precisa de pelo menos 5 cartas do mesmo naipe
+                # Verifica sequência normal
+                for i in range(len(suited_cards) - 4):
+                    values = [c.value for c in suited_cards[i:i+5]]
+                    if values == list(range(min(values), max(values) + 1)) and len(values) == 5:
+                        return "Straight Flush", 900 + max(values)
+                
+                # Verifica sequência A-5 em flush
+                if 14 in [c.value for c in suited_cards]:  # Se tem Ás
+                    ace_low_values = []
+                    for c in suited_cards:
+                        if c.value == 14:
+                            ace_low_values.append(1)
+                        else:
+                            ace_low_values.append(c.value)
+                    ace_low_values.sort()
+                    
+                    for i in range(len(ace_low_values) - 4):
+                        values = ace_low_values[i:i+5]
+                        if values == list(range(min(values), max(values) + 1)) and len(values) == 5:
+                            return "Straight Flush", 900 + max(values)
+
         # Conta pares, trincas, quadras
         rank_count: Dict[str, int] = {}
         for card in all_cards:
             rank_count[card.rank] = rank_count.get(card.rank, 0) + 1
         
-        # Quadra
+        # Quadra (valor base 800)
         for rank, count in rank_count.items():
             if count == 4:
-                return "Quadra", Card.rank_values[rank]
+                return "Quadra", 800 + Card.rank_values[rank]
         
-        # Full house
+        # Full house (valor base 700)
         has_three = False
         has_pair = False
         three_value = 0
@@ -159,31 +200,31 @@ class Player:
             elif count == 2:
                 has_pair = True
         if has_three and has_pair:
-            return "Full House", three_value
+            return "Full House", 700 + three_value
         
-        # Flush
+        # Flush (valor base 600)
         if flush:
-            return "Flush", max(card.value for card in all_cards)
+            return "Flush", 600 + max(card.value for card in all_cards)
         
-        # Sequência
+        # Sequência (valor base 500)
         if straight:
-            return "Sequência", straight_high
+            return "Sequência", 500 + straight_high
         
-        # Trinca
+        # Trinca (valor base 400)
         if has_three:
-            return "Trinca", three_value
+            return "Trinca", 400 + three_value
         
-        # Dois pares
+        # Dois pares (valor base 300)
         pairs = [(rank, count) for rank, count in rank_count.items() if count == 2]
         if len(pairs) >= 2:
-            return "Dois Pares", max(Card.rank_values[rank] for rank, _ in pairs)
+            return "Dois Pares", 300 + max(Card.rank_values[rank] for rank, _ in pairs)
         
-        # Par
+        # Par (valor base 200)
         if len(pairs) == 1:
-            return "Par", Card.rank_values[pairs[0][0]]
+            return "Par", 200 + Card.rank_values[pairs[0][0]]
         
-        # Carta alta
-        return "Carta Alta", max(card.value for card in all_cards)
+        # Carta alta (valor base 100)
+        return "Carta Alta", 100 + max(card.value for card in all_cards)
 
     def evaluate_preflop_hand(self) -> float:
         """
@@ -348,7 +389,7 @@ class Player:
 
     def update_q_value(self, state: str, action: str, reward: float, next_state: str):
         """
-        Updates Q-value with improved reward calculation and learning rate decay
+        Updates Q-value with sequence-aware learning and adaptive parameters
         """
         if state not in self.q_table:
             self.q_table[state] = {'fold': 0, 'call': 0, 'raise': 0}
@@ -356,27 +397,62 @@ class Player:
         if next_state not in self.q_table:
             self.q_table[next_state] = {'fold': 0, 'call': 0, 'raise': 0}
         
-        # Decay learning rate over time
-        if not hasattr(self, 'learning_steps'):
-            self.learning_steps = 0
-        self.learning_steps += 1
-        decayed_learning_rate = self.learning_rate * (1 / (1 + 0.001 * self.learning_steps))
+        # Initialize game sequence if not exists
+        if not hasattr(self, 'game_sequence'):
+            self.game_sequence = {
+                'hands_played': 0,
+                'total_chip_diff': 0,
+                'win_streak': 0,
+                'max_chips': self.chips,
+                'learning_steps': 0
+            }
         
-        # Calculate temporal difference
+        self.game_sequence['learning_steps'] += 1
+        
+        # Adaptive learning rate based on sequence performance
+        base_learning_rate = self.learning_rate
+        if self.game_sequence['hands_played'] > 0:
+            # Adjust learning rate based on performance trend
+            avg_chip_diff = self.game_sequence['total_chip_diff'] / self.game_sequence['hands_played']
+            performance_factor = 1.0 + (avg_chip_diff * 0.5)  # Increase learning when performing well
+            win_streak_factor = 1.0 + (min(self.game_sequence['win_streak'] * 0.1, 0.5))  # Bonus for win streaks
+            
+            # Decay learning rate over time but maintain minimum
+            time_decay = max(0.5, 1.0 / (1 + 0.0005 * self.game_sequence['learning_steps']))
+            
+            adaptive_learning_rate = base_learning_rate * performance_factor * win_streak_factor * time_decay
+            learning_rate = min(0.5, max(0.01, adaptive_learning_rate))  # Keep between 0.01 and 0.5
+        else:
+            learning_rate = base_learning_rate
+        
+        # Enhanced temporal difference calculation
         current_q = self.q_table[state][action]
         next_max_q = max(self.q_table[next_state].values())
-        temporal_diff = reward + self.discount_factor * next_max_q - current_q
+        
+        # Adjust discount factor based on game stage and performance
+        base_discount = self.discount_factor
+        if hasattr(self, 'chips'):
+            chips_ratio = self.chips / 1000  # Normalize by initial chips
+            # Increase long-term planning when ahead, more immediate rewards when behind
+            adjusted_discount = base_discount * (1.0 + (chips_ratio - 1.0) * 0.2)
+            discount_factor = min(0.99, max(0.5, adjusted_discount))
+        else:
+            discount_factor = base_discount
+        
+        # Calculate temporal difference with sequence-aware discounting
+        temporal_diff = reward + discount_factor * next_max_q - current_q
         
         # Update Q-value with eligibility traces
         if not hasattr(self, 'eligibility_traces'):
             self.eligibility_traces = {}
         
-        # Initialize or decay eligibility traces
+        # Initialize or decay eligibility traces with adaptive decay
+        trace_decay = 0.9 if self.game_sequence['hands_played'] < 10 else 0.95  # More persistent traces later in game
         for s in self.q_table:
             if s not in self.eligibility_traces:
                 self.eligibility_traces[s] = {'fold': 0, 'call': 0, 'raise': 0}
             for a in self.eligibility_traces[s]:
-                self.eligibility_traces[s][a] *= 0.9  # Decay factor
+                self.eligibility_traces[s][a] *= trace_decay
         
         # Set eligibility trace for current state-action pair
         if state not in self.eligibility_traces:
@@ -387,8 +463,13 @@ class Player:
         for s in self.q_table:
             for a in self.q_table[s]:
                 if s in self.eligibility_traces:
-                    self.q_table[s][a] += (decayed_learning_rate * temporal_diff * 
-                                         self.eligibility_traces[s][a])
+                    update = learning_rate * temporal_diff * self.eligibility_traces[s][a]
+                    
+                    # Limit the magnitude of updates to prevent instability
+                    max_update = 0.5  # Maximum allowed update
+                    update = max(-max_update, min(max_update, update))
+                    
+                    self.q_table[s][a] += update
 
     def make_decision(self, community_cards: List[Card], current_bet: int, min_raise: int) -> Tuple[str, int]:
             if self.is_machine:
@@ -445,20 +526,43 @@ class Player:
                     self.opponent_stats['total_actions'] = 0
                 
                 if random.random() < epsilon:
-                    # Strategic action weights based on situation
-                    if "very_wet" in state or "paired" in state:
-                        weights = {'fold': 1, 'call': 3, 'raise': 2}  # More active on dynamic boards
-                    elif hand_strength > 0.7:  # Premium hands
+                    # Strategic action weights based on situation and position
+                    if hand_strength > 0.8:  # Premium hands (AA, KK, QQ, AKs)
                         if "late" in state:
-                            weights = {'fold': 1, 'call': 2, 'raise': 4}  # Very aggressive in position
+                            weights = {'fold': 0, 'call': 1, 'raise': 5}  # Very aggressive in position
                         else:
-                            weights = {'fold': 1, 'call': 3, 'raise': 3}  # Still aggressive out of position
-                    elif hand_strength > 0.5:  # Strong hands
-                        weights = {'fold': 1, 'call': 4, 'raise': 2}  # Call-heavy with good hands
-                    elif hand_strength > 0.3:  # Marginal hands
-                        weights = {'fold': 2, 'call': 3, 'raise': 1}  # More calling with medium hands
+                            weights = {'fold': 0, 'call': 2, 'raise': 4}  # Aggressive out of position
+                    elif hand_strength > 0.6:  # Strong hands (JJ, TT, AQs, AJs)
+                        if "late" in state:
+                            weights = {'fold': 0, 'call': 2, 'raise': 3}  # Aggressive in position
+                        else:
+                            weights = {'fold': 1, 'call': 3, 'raise': 2}  # More cautious out of position
+                    elif hand_strength > 0.4:  # Playable hands (99, 88, ATs, KQs)
+                        if "late" in state:
+                            weights = {'fold': 1, 'call': 3, 'raise': 2}  # Position allows more aggression
+                        else:
+                            weights = {'fold': 2, 'call': 3, 'raise': 1}  # Mostly call out of position
+                    elif hand_strength > 0.2:  # Marginal hands (77, A9s, KJs)
+                        if "late" in state:
+                            weights = {'fold': 2, 'call': 3, 'raise': 1}  # Mostly call in position
+                        else:
+                            weights = {'fold': 3, 'call': 2, 'raise': 0}  # Often fold out of position
                     else:  # Weak hands
-                        weights = {'fold': 5, 'call': 1, 'raise': 1}  # Mostly fold weak hands
+                        if "late" in state:
+                            weights = {'fold': 3, 'call': 1, 'raise': 0}  # Sometimes play in position
+                        else:
+                            weights = {'fold': 4, 'call': 1, 'raise': 0}  # Almost always fold
+                            
+                    # Adjust weights based on board texture
+                    if "very_wet" in state:
+                        # More cautious on very coordinated boards
+                        weights['raise'] = max(0, weights['raise'] - 1)
+                        weights['call'] += 1
+                    elif "paired" in state:
+                        # More aggressive on paired boards with strong hands
+                        if hand_strength > 0.6:
+                            weights['raise'] += 1
+                            weights['fold'] = max(0, weights['fold'] - 1)
                     
                     # More conservative adjustments based on opponent tendencies
                     if self.opponent_stats['total_actions'] > 10:  # Only adjust if we have enough data
@@ -685,9 +789,13 @@ class PokerGame:
         for player in active_players:
             print(f"\n👤 {player.name}")
             print(f"💰 Chips: {player.chips}")
-            if len(self.community_cards) > 0 and not player.is_machine:
+            if len(self.community_cards) > 0:
                 hand_type, _ = player.get_hand_value(self.community_cards)
                 print(f"🃏 Melhor jogo: {hand_type}")
+                print(f"🎴 Cartas na mão: {player.show_hand()}")
+                print(f"🎴 Mesa: {self.show_community_cards()}")
+            else:
+                print(f"🎴 Cartas na mão: {player.show_hand()}")
             print("-" * 40)
             
             # Verifica situação de all-in
@@ -780,12 +888,14 @@ class PokerGame:
         winner = None
         
         # Mostra as mãos de todos os jogadores ativos
+        print("\n📊 RESULTADO FINAL DAS MÃOS:")
         for player in active_players:
             hand_type, value = player.get_hand_value(self.community_cards)
+            print("\n" + "-" * 40)
             print(f"👤 {player.name}:")
+            print(f"🃏 MELHOR JOGO: {hand_type}")
             print(f"🎴 Cartas na mão: {player.show_hand()}")
-            print(f"🃏 Melhor jogo: {hand_type}")
-            print(f"🎴 Usando cartas da mesa: {self.show_community_cards()}")
+            print(f"🎴 Cartas da mesa: {self.show_community_cards()}")
             print("-" * 40)
             
             # Atualiza o vencedor se esta mão for melhor
@@ -861,57 +971,59 @@ class PokerGame:
             # Atualiza Q-values para máquinas baseado no resultado
             for player in self.players:
                 if player.is_machine:
-                    # Balanced reward calculation
-                    initial_chips = 1000
-                    chips_diff = (player.chips - initial_chips) / initial_chips  # Normalized chip difference
+                    # Find opponent
+                    opponent = next(p for p in self.players if p != player)
                     
-                    # Calculate hand strength first
-                    hand_strength = player.evaluate_hand_strength(self.community_cards)
+                    # Calculate chip difference relative to opponent
+                    chips_diff = (player.chips - opponent.chips) / 1000  # Normalize by initial chips
                     
-                    # Balanced result reward
+                    # Track game sequence performance
+                    if not hasattr(player, 'game_sequence'):
+                        player.game_sequence = {
+                            'hands_played': 0,
+                            'total_chip_diff': 0,
+                            'win_streak': 0,
+                            'max_chips': player.chips,
+                            'learning_steps': 0
+                        }
+                    
+                    player.game_sequence['hands_played'] += 1
+                    player.game_sequence['total_chip_diff'] += chips_diff
+                    
                     if player == winner:
-                        result_reward = 0.3  # Further reduced to prevent overconfidence
+                        player.game_sequence['win_streak'] += 1
                     else:
-                        # More nuanced losing penalty
-                        result_reward = -0.3 if hand_strength < 0.5 else -0.2
+                        player.game_sequence['win_streak'] = 0
                     
-                    # Balanced aggressive play rewards
-                    aggressive_bonus = 0.0
-                    if hasattr(player, 'last_action'):
-                        if player.last_action == 'raise':
-                            if hand_strength > 0.6:  # Lower threshold for aggressive play
-                                aggressive_bonus = 0.2
-                            elif hand_strength < 0.4:  # More balanced penalty for weak hands
-                                aggressive_bonus = -0.1
-                        elif player.last_action == 'fold' and hand_strength > 0.6:
-                            aggressive_bonus = -0.2  # Reduced penalty for folding strong hands
+                    player.game_sequence['max_chips'] = max(player.game_sequence['max_chips'], player.chips)
                     
-                    # More balanced bluff rewards
-                    bluff_bonus = 0.0
-                    if player == winner and hasattr(player, 'last_action'):
-                        if hand_strength < 0.4:  # Successful bluff
-                            if player.last_action == 'raise':
-                                bluff_bonus = 0.2  # Reduced from 0.3
-                            elif player.last_action == 'call':
-                                bluff_bonus = 0.1  # Smaller reward for calling bluffs
+                    # Calculate sequence-based metrics
+                    avg_chip_diff = player.game_sequence['total_chip_diff'] / player.game_sequence['hands_played']
+                    win_streak_bonus = min(0.1 * player.game_sequence['win_streak'], 0.3)  # Cap at 0.3
+                    chip_retention = player.chips / player.game_sequence['max_chips']
                     
-                    # Position-based rewards
+                    # Hand strength and position factors
+                    hand_strength = player.evaluate_hand_strength(self.community_cards)
                     position_multiplier = 1.1 if player.position == "late" else 0.9
                     
-                    # Pot odds consideration
-                    pot_odds = self.current_bet / (self.current_bet + player.chips) if self.current_bet > 0 else 0
-                    pot_odds_factor = 1.0
+                    # Action-based components
+                    action_reward = 0.0
                     if hasattr(player, 'last_action'):
-                        if player.last_action == 'call' and pot_odds > 0.3:
-                            pot_odds_factor = 0.8  # Penalize calling with bad pot odds
+                        if player.last_action == 'raise':
+                            if chips_diff > 0:  # Reward aggressive play when ahead
+                                action_reward = 0.2
+                            else:  # Smaller reward when behind to encourage comebacks
+                                action_reward = 0.1
+                        elif player.last_action == 'fold':
+                            action_reward = 0.1 if chips_diff < -0.3 else -0.1  # Reward conservative play when significantly behind
                     
-                    # Combine rewards with balanced weights
+                    # Combine rewards with emphasis on chip difference and sequence performance
                     reward = (
-                        0.35 * chips_diff +          # 35% based on chips
-                        0.25 * result_reward +       # 25% based on win/loss
-                        0.15 * aggressive_bonus +    # 15% based on aggression
-                        0.10 * bluff_bonus +         # 10% based on bluffs
-                        0.15 * (pot_odds_factor - 1) # 15% based on pot odds
+                        0.4 * chips_diff +           # Current hand performance
+                        0.2 * avg_chip_diff +        # Long-term performance
+                        0.15 * win_streak_bonus +    # Consecutive wins bonus
+                        0.15 * chip_retention +      # Bankroll management
+                        0.1 * action_reward          # Action-specific reward
                     ) * position_multiplier
                     
                     # Estado final é o estado atual
@@ -963,8 +1075,8 @@ def run_machine_vs_machine_test(num_games=100):
     machine2 = Player("Máquina 2", is_machine=True)
     
     stats = {
-        "Máquina 1": {"wins": 0, "chips_won": 0},
-        "Máquina 2": {"wins": 0, "chips_won": 0}
+        "Máquina 1": {"wins": 0, "chips_won": 0, "folds": 0},
+        "Máquina 2": {"wins": 0, "chips_won": 0, "folds": 0}
     }
     
     for game_num in range(1, num_games + 1):
@@ -979,6 +1091,11 @@ def run_machine_vs_machine_test(num_games=100):
         game.play()
         
         # Registra estatísticas
+        if machine1.folded:
+            stats["Máquina 1"]["folds"] += 1
+        if machine2.folded:
+            stats["Máquina 2"]["folds"] += 1
+            
         if machine1.chips > machine2.chips:
             stats["Máquina 1"]["wins"] += 1
             stats["Máquina 1"]["chips_won"] += (machine1.chips - 1000)
@@ -998,9 +1115,11 @@ def run_machine_vs_machine_test(num_games=100):
     for machine, results in stats.items():
         win_rate = (results["wins"] / num_games) * 100
         avg_chips = results["chips_won"] / num_games
+        fold_rate = (results["folds"] / num_games) * 100
         print(f"\n► {machine}:")
         print(f"  Vitórias: {results['wins']} ({win_rate:.1f}%)")
         print(f"  Média de chips ganhos por jogo: {avg_chips:.1f}")
+        print(f"  Desistências: {results['folds']} ({fold_rate:.1f}%)")
 
 if __name__ == "__main__":
     try:
