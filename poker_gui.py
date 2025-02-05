@@ -38,6 +38,7 @@ class PokerGUI:
         self.machine = Player("Máquina", is_machine=True)
         self.game = None
         self.current_bet = 50
+        self.betting_round_complete = False  # New flag to track betting round completion
         
         # Session tracking
         self.hands_played = 0
@@ -244,6 +245,7 @@ class PokerGUI:
         self.player.folded = False
         self.machine.hand = []
         self.machine.folded = False
+        self.betting_round_complete = False  # Reset betting round flag
         
         # Initialize new game
         self.game = PokerGame([self.player, self.machine])
@@ -276,8 +278,9 @@ class PokerGUI:
         # Atualiza cartas do oponente
         for i, label in enumerate(self.opponent_card_labels):
             if i < len(self.machine.hand):
-                # Only show machine's cards if game ended naturally (all community cards revealed) and no one folded
-                if self.game and len(self.game.community_cards) == 5 and not any(p.folded for p in self.game.players):
+                # Only show machine's cards if game ended naturally (all community cards revealed), betting is complete, and no one folded
+                if (self.game and len(self.game.community_cards) == 5 and 
+                    self.betting_round_complete and not any(p.folded for p in self.game.players)):
                     card = self.machine.hand[i]
                     image = self.card_graphics.get_card_image(card.rank, card.suit)
                 else:
@@ -322,6 +325,7 @@ class PokerGUI:
             self.end_hand("Jogador 1")
             return
             
+        self.betting_round_complete = True  # Mark betting round as complete after both players have acted
         self.update_display()
         self.check_game_state()
 
@@ -345,6 +349,7 @@ class PokerGUI:
                 self.end_hand("Jogador 1")
                 return
                 
+            self.betting_round_complete = True  # Mark betting round as complete after both players have acted
             self.update_display()
             self.check_game_state()
         else:
@@ -368,6 +373,7 @@ class PokerGUI:
             self.game.pot += amount
             self.current_bet = amount
             self.log_message(f"Máquina: Raise para {amount}")
+            self.betting_round_complete = False  # Reset if machine raises
         else:  # call
             bet_amount = min(self.current_bet, self.machine.chips)
             self.machine.chips -= bet_amount
@@ -379,20 +385,28 @@ class PokerGUI:
         if self.player.folded or self.machine.folded:
             return
             
+        # Only proceed to next stage if betting round is complete
+        if not self.betting_round_complete:
+            return
+            
         # Verifica se é hora de revelar novas cartas comunitárias
         if len(self.game.community_cards) == 0:
             self.game.deal_community_cards(3)  # Flop
             self.log_message("\n=== Flop ===")
             self.current_bet = self.game.min_raise  # Reset bet for new round
+            self.betting_round_complete = False  # Reset for new betting round
         elif len(self.game.community_cards) == 3:
             self.game.deal_community_cards(1)  # Turn
             self.log_message("\n=== Turn ===")
             self.current_bet = self.game.min_raise  # Reset bet for new round
+            self.betting_round_complete = False  # Reset for new betting round
         elif len(self.game.community_cards) == 4:
             self.game.deal_community_cards(1)  # River
             self.log_message("\n=== River ===")
             self.current_bet = self.game.min_raise  # Reset bet for new round
-            self.end_hand()
+            self.betting_round_complete = False  # Reset for new betting round
+        elif len(self.game.community_cards) == 5:
+            self.end_hand()  # Only end hand after River betting is complete
         
         self.update_display()
 
