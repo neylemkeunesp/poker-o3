@@ -39,8 +39,16 @@ class PokerGUI:
         self.game = None
         self.current_bet = 50
         
-        # Inicia novo jogo
-        self.new_game()
+        # Session tracking
+        self.hands_played = 0
+        self.player_wins = 0
+        self.machine_wins = 0
+        self.current_streak = 0  # positive for player streak, negative for machine streak
+        self.target_chips = 5000  # Win condition
+        self.starting_chips = 1000
+        
+        # Start new session
+        self.start_new_session()
 
     def setup_frames(self):
         # Frame superior para cartas comunitárias
@@ -92,9 +100,23 @@ class PokerGUI:
             label.pack(side='left', padx=5)
             self.player_card_labels.append(label)
         
+        # Frame para log do jogo
+        self.log_frame = ttk.Frame(self.main_container)
+        self.log_frame.pack(pady=10, fill='both', expand=True)
+        
+        # Text widget para log
+        self.log_text = tk.Text(self.log_frame, height=6, bg='#0f2819', fg='white', wrap=tk.WORD)
+        self.log_text.pack(fill='both', expand=True, padx=10)
+        
         # Frame para controles
         self.control_frame = ttk.Frame(self.main_container)
         self.control_frame.pack(pady=5, fill='x', side='bottom')
+
+    def log_message(self, message):
+        """Add a message to the game log"""
+        self.log_text.insert(tk.END, message + "\n")
+        self.log_text.see(tk.END)  # Scroll to bottom
+        self.root.update()
 
     def setup_components(self):
         # Labels para cartas comunitárias
@@ -177,27 +199,63 @@ class PokerGUI:
         
         self.new_game_button = ttk.Button(
             button_container,
-            text="Novo Jogo",
-            command=self.new_game,
+            text="Próxima Mão",
+            command=self.new_hand,
             width=15
         )
         self.new_game_button.pack(side='left', padx=5)
+        
+        self.new_session_button = ttk.Button(
+            button_container,
+            text="Nova Sessão",
+            command=self.start_new_session,
+            width=15
+        )
+        self.new_session_button.pack(side='left', padx=5)
 
-    def new_game(self):
-        # Reset player states
+    def start_new_session(self):
+        """Start a new poker session"""
+        # Reset session stats
+        self.hands_played = 0
+        self.player_wins = 0
+        self.machine_wins = 0
+        self.current_streak = 0
+        
+        # Reset player states with starting chips
+        self.player.chips = self.starting_chips
+        self.machine.chips = self.starting_chips
+        
+        # Clear log
+        self.log_text.delete(1.0, tk.END)
+        
+        # Log session start
+        self.log_message("=== Nova Sessão de Poker ===")
+        self.log_message(f"Objetivo: Alcançar {self.target_chips} chips")
+        self.log_message(f"Jogador 1: {self.player.chips} chips")
+        self.log_message(f"Máquina: {self.machine.chips} chips\n")
+        
+        # Start first hand
+        self.new_hand()
+
+    def new_hand(self):
+        """Start a new hand within the current session"""
+        # Reset hand states
         self.player.hand = []
-        self.player.chips = 1000
         self.player.folded = False
         self.machine.hand = []
-        self.machine.chips = 1000
         self.machine.folded = False
         
         # Initialize new game
         self.game = PokerGame([self.player, self.machine])
-        self.current_bet = 50
+        self.current_bet = 50  # Small blind + big blind
         
         # Deal initial cards
         self.game.deal_cards()
+        
+        # Log hand start
+        self.log_message("\n=== Nova Mão ===")
+        self.log_message(f"Jogador 1: {self.player.chips} chips")
+        self.log_message(f"Máquina: {self.machine.chips} chips")
         
         # Update display and enable buttons
         self.update_display()
@@ -251,9 +309,19 @@ class PokerGUI:
         self.player.chips -= bet_amount
         self.game.pot += bet_amount
         
+        self.log_message(f"Jogador: Call {bet_amount}")
+        
+        # Update game state before machine action
+        self.update_display()
+        
         # Ação da máquina
         self.machine_action()
         
+        # Check if machine folded
+        if self.machine.folded:
+            self.end_hand("Jogador 1")
+            return
+            
         self.update_display()
         self.check_game_state()
 
@@ -264,79 +332,81 @@ class PokerGUI:
             self.game.pot += raise_amount
             self.current_bet = raise_amount
             
+            self.log_message(f"Jogador: Raise para {raise_amount}")
+            
+            # Update game state before machine action
+            self.update_display()
+            
             # Ação da máquina
             self.machine_action()
             
+            # Check if machine folded
+            if self.machine.folded:
+                self.end_hand("Jogador 1")
+                return
+                
             self.update_display()
             self.check_game_state()
         else:
-            messagebox.showwarning("Aviso", "Chips insuficientes para raise!")
+            self.log_message("⚠️ Chips insuficientes para raise!")
 
     def fold_action(self):
         self.player.folded = True
-        self.end_game("Máquina")
+        self.log_message("Jogador: Fold")
+        self.end_hand("Máquina")
+        self.disable_buttons()
 
     def machine_action(self):
-        try:
-            hand_type, value = self.machine.get_hand_value(self.game.community_cards)
-            
-            # Probabilidade de continuar baseada no valor da mão
-            prob_table = {
-                "Quadra": 0.95,
-                "Full House": 0.9,
-                "Flush": 0.85,
-                "Sequência": 0.8,
-                "Trinca": 0.75,
-                "Dois Pares": 0.7,
-                "Par": 0.6,
-                "Carta Alta": 0.3
-            }
-            
-            prob = prob_table.get(hand_type, 0.3)
-            
-            # No início do jogo, maior chance de continuar
-            if not self.game.community_cards:
-                prob = max(prob, 0.7)
-            
-            if random.random() < prob:
-                # Call
-                bet_amount = min(self.current_bet, self.machine.chips)
-                self.machine.chips -= bet_amount
-                self.game.pot += bet_amount
-                messagebox.showinfo("Ação da Máquina", "Máquina: Call")
-            else:
-                # Fold
-                self.machine.folded = True
-                self.end_game("Jogador 1")
-        except ValueError:
-            # Se não houver cartas para avaliar, sempre call no início
+        action, amount = self.machine.make_decision(self.game.community_cards, self.current_bet, self.game.min_raise)
+        
+        if action == "fold":
+            self.machine.folded = True
+            self.log_message("Máquina: Fold")
+            return
+        elif action == "raise":
+            self.machine.chips -= amount
+            self.game.pot += amount
+            self.current_bet = amount
+            self.log_message(f"Máquina: Raise para {amount}")
+        else:  # call
             bet_amount = min(self.current_bet, self.machine.chips)
             self.machine.chips -= bet_amount
             self.game.pot += bet_amount
-            messagebox.showinfo("Ação da Máquina", "Máquina: Call")
+            self.log_message(f"Máquina: Call {bet_amount}")
 
     def check_game_state(self):
+        # Only proceed if both players have acted
+        if self.player.folded or self.machine.folded:
+            return
+            
         # Verifica se é hora de revelar novas cartas comunitárias
         if len(self.game.community_cards) == 0:
             self.game.deal_community_cards(3)  # Flop
+            self.log_message("\n=== Flop ===")
+            self.current_bet = self.game.min_raise  # Reset bet for new round
         elif len(self.game.community_cards) == 3:
             self.game.deal_community_cards(1)  # Turn
+            self.log_message("\n=== Turn ===")
+            self.current_bet = self.game.min_raise  # Reset bet for new round
         elif len(self.game.community_cards) == 4:
             self.game.deal_community_cards(1)  # River
-            self.end_game()
+            self.log_message("\n=== River ===")
+            self.current_bet = self.game.min_raise  # Reset bet for new round
+            self.end_hand()
         
         self.update_display()
 
-    def end_game(self, winner_by_fold=None):
+    def end_hand(self, winner_by_fold=None):
+        """End the current hand and update session stats"""
         if winner_by_fold:
             winner_name = winner_by_fold
-            messagebox.showinfo("Fim do Jogo", f"{winner_name} vence por desistência!")
+            self.log_message(f"\n🏆 {winner_name} vence por desistência!")
         else:
             # Determina o vencedor baseado nas mãos
             player_type, player_value = self.player.get_hand_value(self.game.community_cards)
             machine_type, machine_value = self.machine.get_hand_value(self.game.community_cards)
             
-            result = f"Jogador 1 tem {player_type}\nMáquina tem {machine_type}\n\n"
+            result = f"\nJogador 1 tem {player_type}\nMáquina tem {machine_type}\n"
             
             if player_value > machine_value:
                 winner_name = "Jogador 1"
@@ -345,8 +415,17 @@ class PokerGUI:
                 winner_name = "Máquina"
                 self.machine.chips += self.game.pot
             
-            result += f"{winner_name} vence!"
-            messagebox.showinfo("Fim do Jogo", result)
+            result += f"🏆 {winner_name} vence!"
+            self.log_message(result)
+        
+        # Update session stats
+        self.hands_played += 1
+        if winner_name == "Jogador 1":
+            self.player_wins += 1
+            self.current_streak = max(1, self.current_streak + 1)
+        else:
+            self.machine_wins += 1
+            self.current_streak = min(-1, self.current_streak - 1)
         
         # Registra o resultado
         self.game.history_manager.record_game({
@@ -360,24 +439,60 @@ class PokerGUI:
         # Atualiza o ranking
         self.game.ranking_manager.update_ranking(winner_name)
         
-        # Desabilita os botões de ação
-        self.disable_buttons()
+        # Show session stats
+        self.log_message(f"\n=== Estatísticas da Sessão ===")
+        self.log_message(f"Mãos jogadas: {self.hands_played}")
+        self.log_message(f"Vitórias do Jogador: {self.player_wins}")
+        self.log_message(f"Vitórias da Máquina: {self.machine_wins}")
+        streak_owner = "Jogador" if self.current_streak > 0 else "Máquina"
+        streak_count = abs(self.current_streak)
+        if streak_count > 1:
+            self.log_message(f"🔥 {streak_owner} está em uma sequência de {streak_count} vitórias!")
         
-        # Mostra o ranking
-        with open("ranking.json", "r") as f:
-            rankings = json.load(f)
-        ranking_text = "Ranking:\n" + "\n".join(f"{name}: {wins}" for name, wins in rankings.items())
-        messagebox.showinfo("Ranking", ranking_text)
+        # Show chips
+        self.log_message(f"\nJogador 1: {self.player.chips} chips")
+        self.log_message(f"Máquina: {self.machine.chips} chips")
+        
+        # Check if session should end
+        if self.player.chips <= 0:
+            self.log_message("\n🏆 Máquina vence a sessão! Jogador ficou sem chips.")
+            self.disable_all_buttons()
+            return
+        elif self.machine.chips <= 0:
+            self.log_message("\n🏆 Jogador vence a sessão! Máquina ficou sem chips.")
+            self.disable_all_buttons()
+            return
+        elif self.player.chips >= self.target_chips:
+            self.log_message(f"\n🏆 Jogador vence a sessão! Alcançou {self.target_chips} chips!")
+            self.disable_all_buttons()
+            return
+        elif self.machine.chips >= self.target_chips:
+            self.log_message(f"\n🏆 Máquina vence a sessão! Alcançou {self.target_chips} chips!")
+            self.disable_all_buttons()
+            return
+        
+        # Continue to next hand
+        self.log_message("\nPressione 'Próxima Mão' para continuar")
+        self.new_game_button.config(state='normal')
+        self.call_button.config(state='disabled')
+        self.raise_button.config(state='disabled')
+        self.fold_button.config(state='disabled')
 
     def enable_buttons(self):
         self.call_button.config(state='normal')
         self.raise_button.config(state='normal')
         self.fold_button.config(state='normal')
+        self.new_game_button.config(state='disabled')
 
     def disable_buttons(self):
         self.call_button.config(state='disabled')
         self.raise_button.config(state='disabled')
         self.fold_button.config(state='disabled')
+
+    def disable_all_buttons(self):
+        self.disable_buttons()
+        self.new_game_button.config(state='disabled')
+        self.new_session_button.config(state='normal')
 
 if __name__ == "__main__":
     root = tk.Tk()

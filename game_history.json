@@ -1,0 +1,100 @@
+[
+    {
+        "winner": "Jogador 1",
+        "pot": 250,
+        "community_cards": "10 de Paus, 9 de Paus, 7 de Ouros, Dama de Paus",
+        "player_hand": "10 de Espadas, 6 de Ouros",
+        "machine_hand": "4 de Copas, 5 de Paus"
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 250,
+        "community_cards": "10 de Paus, 9 de Paus, 7 de Ouros, Dama de Paus, 2 de Espadas",
+        "player_hand": "10 de Espadas, 6 de Ouros",
+        "machine_hand": "4 de Copas, 5 de Paus"
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 260,
+        "community_cards": "\u00c1s de Espadas, 4 de Paus, 6 de Espadas, Valete de Copas, \u00c1s de Paus",
+        "player_hand": "\u00c1s de Copas, 10 de Espadas",
+        "machine_hand": "Valete de Espadas, 9 de Copas"
+    },
+    {
+        "winner": "M\u00e1quina",
+        "pot": 220,
+        "community_cards": "\u00c1s de Ouros, 3 de Espadas, 7 de Paus, 3 de Paus, 3 de Copas",
+        "player_hand": "5 de Paus, 7 de Espadas",
+        "machine_hand": "\u00c1s de Espadas, 4 de Espadas"
+    },
+    {
+        "winner": "M\u00e1quina",
+        "pot": 180,
+        "community_cards": "Valete de Ouros, Valete de Copas, 5 de Ouros, 2 de Paus",
+        "player_hand": "7 de Paus, 8 de Espadas",
+        "machine_hand": "5 de Copas, Rei de Ouros"
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 300,
+        "community_cards": "4 de Espadas, 5 de Ouros, 3 de Paus, 4 de Ouros, 8 de Ouros",
+        "player_hand": "3 de Copas, 9 de Ouros",
+        "machine_hand": "10 de Paus, 7 de Ouros"
+    },
+    {
+        "winner": "M\u00e1quina",
+        "pot": 140,
+        "community_cards": "Valete de Paus, \u00c1s de Espadas, 10 de Espadas, 8 de Espadas",
+        "player_hand": "9 de Espadas, 4 de Copas",
+        "machine_hand": "7 de Espadas, 4 de Espadas"
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 300,
+        "community_cards": "5 de Copas, 7 de Copas, Dama de Paus, 8 de Ouros, 6 de Copas",
+        "player_hand": "Valete de Paus, Dama de Ouros",
+        "machine_hand": "\u00c1s de Espadas, 3 de Ouros"
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 180,
+        "community_cards": "3 de Espadas, 7 de Ouros, Rei de Paus, 4 de Ouros, 8 de Copas",
+        "player_hand": "3 de Paus, 5 de Paus",
+        "machine_hand": "10 de Ouros, 9 de Espadas"
+    },
+    {
+        "winner": "M\u00e1quina",
+        "pot": 300,
+        "community_cards": "2 de Ouros, \u00c1s de Copas, 10 de Ouros, 7 de Ouros, 8 de Paus",
+        "player_hand": "4 de Espadas, 5 de Ouros",
+        "machine_hand": "Dama de Copas, 3 de Ouros"
+    },
+    {
+        "winner": "M\u00e1quina",
+        "pot": 180,
+        "community_cards": "10 de Paus, Rei de Ouros, 5 de Ouros, 4 de Copas, 2 de Copas",
+        "player_hand": "7 de Ouros, Valete de Copas",
+        "machine_hand": "6 de Ouros, 6 de Paus"
+    },
+    {
+        "winner": "M\u00e1quina",
+        "pot": 260,
+        "community_cards": "Valete de Ouros, 7 de Paus, 2 de Paus, Rei de Ouros, 4 de Ouros",
+        "player_hand": "\u00c1s de Copas, 4 de Copas",
+        "machine_hand": "2 de Espadas, 2 de Copas"
+    },
+    {
+        "winner": "M\u00e1quina",
+        "pot": 180,
+        "community_cards": "Valete de Ouros, Dama de Copas, 6 de Ouros, 4 de Espadas, Rei de Ouros",
+        "player_hand": "3 de Copas, 10 de Paus",
+        "machine_hand": "\u00c1s de Ouros, 5 de Copas"
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 260,
+        "community_cards": "2 de Paus, 2 de Copas, 6 de Ouros, \u00c1s de Ouros, 10 de Espadas",
+        "player_hand": "9 de Espadas, 6 de Paus",
+        "machine_hand": "8 de Espadas, 4 de Paus"
+    }
+]

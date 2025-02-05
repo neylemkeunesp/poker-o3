@@ -49,12 +49,25 @@ class CardGraphics:
         # Determine color based on suit
         color = self.red if suit in ['Hearts', 'Diamonds'] else self.black
         
-        try:
-            # Try to load a system font
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
-            symbol_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 30)
-        except OSError:
-            # Fallback to default font
+        # Try different system font locations
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux
+            "/System/Library/Fonts/Supplemental/Arial Bold.ttf",      # macOS
+            "C:\\Windows\\Fonts\\arialbd.ttf"                        # Windows
+        ]
+        
+        font = None
+        for font_path in font_paths:
+            try:
+                if os.path.exists(font_path):
+                    font = ImageFont.truetype(font_path, 20)
+                    symbol_font = ImageFont.truetype(font_path, 30)
+                    break
+            except OSError:
+                continue
+        
+        if font is None:
+            # Fallback to default font if no system fonts are available
             font = ImageFont.load_default()
             symbol_font = ImageFont.load_default()
         

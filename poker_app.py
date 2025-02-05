@@ -97,15 +97,16 @@ class Player:
 
     def save_q_table(self):
         """Salva a Q-table no arquivo."""
+        import os
+        q_table_path = os.path.join(os.getcwd(), "q_table.json")
         try:
-            with open("q_table.json", "r") as f:
+            with open(q_table_path, "r") as f:
                 q_tables = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             q_tables = {}
         
         q_tables[self.name] = self.q_table
-        
-        with open("q_table.json", "w") as f:
+        with open(q_table_path, "w") as f:
             json.dump(q_tables, f, indent=4)
 
     def receive_card(self, card: Card):
@@ -414,14 +415,14 @@ class Player:
         if self.game_sequence['hands_played'] > 0:
             # Adjust learning rate based on performance trend
             avg_chip_diff = self.game_sequence['total_chip_diff'] / self.game_sequence['hands_played']
-            performance_factor = 1.0 + (avg_chip_diff * 0.5)  # Increase learning when performing well
-            win_streak_factor = 1.0 + (min(self.game_sequence['win_streak'] * 0.1, 0.5))  # Bonus for win streaks
+            performance_factor = 1.0 + (avg_chip_diff * 0.3)  # Reduced performance impact
+            win_streak_factor = 1.0 + (min(self.game_sequence['win_streak'] * 0.05, 0.3))  # Reduced win streak bonus
             
-            # Decay learning rate over time but maintain minimum
-            time_decay = max(0.5, 1.0 / (1 + 0.0005 * self.game_sequence['learning_steps']))
+            # More aggressive learning rate decay
+            time_decay = max(0.3, 1.0 / (1 + 0.001 * self.game_sequence['learning_steps']))  # Faster decay
             
             adaptive_learning_rate = base_learning_rate * performance_factor * win_streak_factor * time_decay
-            learning_rate = min(0.5, max(0.01, adaptive_learning_rate))  # Keep between 0.01 and 0.5
+            learning_rate = min(0.3, max(0.01, adaptive_learning_rate))  # Lower maximum learning rate
         else:
             learning_rate = base_learning_rate
         
@@ -433,9 +434,9 @@ class Player:
         base_discount = self.discount_factor
         if hasattr(self, 'chips'):
             chips_ratio = self.chips / 1000  # Normalize by initial chips
-            # Increase long-term planning when ahead, more immediate rewards when behind
-            adjusted_discount = base_discount * (1.0 + (chips_ratio - 1.0) * 0.2)
-            discount_factor = min(0.99, max(0.5, adjusted_discount))
+            # More conservative long-term planning adjustment
+            adjusted_discount = base_discount * (1.0 + (chips_ratio - 1.0) * 0.1)
+            discount_factor = min(0.95, max(0.6, adjusted_discount))  # Higher minimum discount
         else:
             discount_factor = base_discount
         
@@ -447,7 +448,7 @@ class Player:
             self.eligibility_traces = {}
         
         # Initialize or decay eligibility traces with adaptive decay
-        trace_decay = 0.9 if self.game_sequence['hands_played'] < 10 else 0.95  # More persistent traces later in game
+        trace_decay = 0.85 if self.game_sequence['hands_played'] < 10 else 0.9  # Reduced trace persistence
         for s in self.q_table:
             if s not in self.eligibility_traces:
                 self.eligibility_traces[s] = {'fold': 0, 'call': 0, 'raise': 0}
@@ -464,11 +465,8 @@ class Player:
             for a in self.q_table[s]:
                 if s in self.eligibility_traces:
                     update = learning_rate * temporal_diff * self.eligibility_traces[s][a]
-                    
-                    # Limit the magnitude of updates to prevent instability
-                    max_update = 0.5  # Maximum allowed update
+                    max_update = 0.3  # Reduced maximum update
                     update = max(-max_update, min(max_update, update))
-                    
                     self.q_table[s][a] += update
 
     def make_decision(self, community_cards: List[Card], current_bet: int, min_raise: int) -> Tuple[str, int]:
@@ -476,23 +474,26 @@ class Player:
                 state = self.get_state(community_cards, current_bet)
                 
                 if state not in self.q_table:
-                    # Strategic initial Q-values
+                    # More balanced initial Q-values with randomization
                     hand_strength = self.evaluate_hand_strength(community_cards)
-                    position_factor = 1.2 if "late" in state else 0.8  # Increased position impact
-                    texture_factor = 1.2 if "wet" in state or "very_wet" in state else 1.0
+                    position_factor = 1.1 if "late" in state else 0.9  # Reduced position impact
+                    texture_factor = 1.1 if "wet" in state or "very_wet" in state else 1.0
                     
-                    # Base values that encourage more action with strong hands
-                    fold_base = -0.2 - (hand_strength * 0.3)  # Stronger penalty for folding good hands
-                    call_base = 0.0 + (hand_strength * 0.4) * position_factor  # More reward for calling with good hands
-                    raise_base = -0.1 + (hand_strength * 0.5) * position_factor * texture_factor  # Aggressive with very strong hands
+                    # Add small random variation to prevent identical initial values
+                    random_factor = lambda: random.uniform(-0.05, 0.05)
                     
-                    # Adjust for preflop play
+                    # More conservative base values
+                    fold_base = -0.1 - (hand_strength * 0.2) + random_factor()
+                    call_base = 0.0 + (hand_strength * 0.3) * position_factor + random_factor()
+                    raise_base = -0.05 + (hand_strength * 0.4) * position_factor * texture_factor + random_factor()
+                    
+                    # More balanced preflop adjustments
                     if len(community_cards) == 0:
                         if hand_strength > 0.7:  # Premium hands
-                            fold_base -= 0.2
-                            raise_base += 0.3
+                            fold_base -= 0.1
+                            raise_base += 0.2
                         elif hand_strength > 0.5:  # Playable hands
-                            call_base += 0.2
+                            call_base += 0.1
                     
                     self.q_table[state] = {
                         'fold': fold_base,
@@ -500,123 +501,23 @@ class Player:
                         'raise': raise_base
                     }
                 
-                # Dynamic exploration strategy
-                hand_strength = self.evaluate_hand_strength(community_cards)
-                
-                # Exploration rates based on game stage
-                base_epsilon = 0.15  # Lower base exploration
-                phase_factor = 1.0 if len(community_cards) == 0 else 0.8  # More consistent preflop play
-                position_factor = 1.2 if "late" in state else 0.8  # Increased position impact
-                stack_factor = float(state.split('_')[4])  # chips_ratio
-                
-                # Exploration rate that considers hand strength more strongly
-                epsilon = min(0.4, (base_epsilon * phase_factor * position_factor * 
-                         (1 - hand_strength * 0.8) * stack_factor))  # More hand-strength dependent
-                
-                # Initialize opponent stats with total_actions
-                if not hasattr(self, 'opponent_stats'):
-                    self.opponent_stats = {
-                        'aggression_frequency': 0.5,
-                        'fold_frequency': 0.5,
-                        'raise_frequency': 0.5,
-                        'action_history': [],
-                        'total_actions': 0
-                    }
-                elif 'total_actions' not in self.opponent_stats:
-                    self.opponent_stats['total_actions'] = 0
-                
-                if random.random() < epsilon:
-                    # Strategic action weights based on situation and position
-                    if hand_strength > 0.8:  # Premium hands (AA, KK, QQ, AKs)
-                        if "late" in state:
-                            weights = {'fold': 0, 'call': 1, 'raise': 5}  # Very aggressive in position
-                        else:
-                            weights = {'fold': 0, 'call': 2, 'raise': 4}  # Aggressive out of position
-                    elif hand_strength > 0.6:  # Strong hands (JJ, TT, AQs, AJs)
-                        if "late" in state:
-                            weights = {'fold': 0, 'call': 2, 'raise': 3}  # Aggressive in position
-                        else:
-                            weights = {'fold': 1, 'call': 3, 'raise': 2}  # More cautious out of position
-                    elif hand_strength > 0.4:  # Playable hands (99, 88, ATs, KQs)
-                        if "late" in state:
-                            weights = {'fold': 1, 'call': 3, 'raise': 2}  # Position allows more aggression
-                        else:
-                            weights = {'fold': 2, 'call': 3, 'raise': 1}  # Mostly call out of position
-                    elif hand_strength > 0.2:  # Marginal hands (77, A9s, KJs)
-                        if "late" in state:
-                            weights = {'fold': 2, 'call': 3, 'raise': 1}  # Mostly call in position
-                        else:
-                            weights = {'fold': 3, 'call': 2, 'raise': 0}  # Often fold out of position
-                    else:  # Weak hands
-                        if "late" in state:
-                            weights = {'fold': 3, 'call': 1, 'raise': 0}  # Sometimes play in position
-                        else:
-                            weights = {'fold': 4, 'call': 1, 'raise': 0}  # Almost always fold
-                            
-                    # Adjust weights based on board texture
-                    if "very_wet" in state:
-                        # More cautious on very coordinated boards
-                        weights['raise'] = max(0, weights['raise'] - 1)
-                        weights['call'] += 1
-                    elif "paired" in state:
-                        # More aggressive on paired boards with strong hands
-                        if hand_strength > 0.6:
-                            weights['raise'] += 1
-                            weights['fold'] = max(0, weights['fold'] - 1)
+                # Simplified decision making for human games
+                if not hasattr(self, 'last_action'):
+                    hand_strength = self.evaluate_hand_strength(community_cards)
                     
-                    # More conservative adjustments based on opponent tendencies
-                    if self.opponent_stats['total_actions'] > 10:  # Only adjust if we have enough data
-                        if self.opponent_stats['aggression_frequency'] > 0.7:
-                            weights['raise'] *= 0.8  # More defensive against aggressive opponents
-                            weights['call'] *= 1.2
-                        elif self.opponent_stats['fold_frequency'] > 0.7:
-                            weights['raise'] *= 1.2  # Slightly more aggressive against tight opponents
-                    
-                    actions = list(weights.keys())
-                    weights = list(weights.values())
-                    action = random.choices(actions, weights=weights)[0]
-                    
-                    # Update opponent stats
-                    self.opponent_stats['total_actions'] += 1
-                    if action == 'raise':
-                        self.opponent_stats['aggression_frequency'] = (
-                            (self.opponent_stats['aggression_frequency'] * (self.opponent_stats['total_actions'] - 1) + 1) / 
-                            self.opponent_stats['total_actions']
-                        )
-                    elif action == 'fold':
-                        self.opponent_stats['fold_frequency'] = (
-                            (self.opponent_stats['fold_frequency'] * (self.opponent_stats['total_actions'] - 1) + 1) / 
-                            self.opponent_stats['total_actions']
-                        )
+                    # Base decision on hand strength
+                    if hand_strength > 0.8:  # Very strong hand
+                        action = 'raise'
+                    elif hand_strength > 0.5:  # Decent hand
+                        action = 'call'
+                    else:  # Weak hand
+                        action = 'fold' if current_bet > self.chips * 0.1 else 'call'
                 else:
-                    # Strategic action selection
-                    q_values = self.q_table[state]
-                    max_q = max(q_values.values())
-                    best_actions = [a for a, q in q_values.items() if q == max_q]
-                    
-                    # Break ties based on multiple factors
-                    if len(best_actions) > 1:
-                        if "late" in state and hand_strength > 0.5:
-                            action = 'raise' if 'raise' in best_actions else best_actions[0]
-                        elif "wet" in state or "very_wet" in state:
-                            action = 'call' if 'call' in best_actions else best_actions[0]
-                        else:
-                            action = best_actions[0]
-                    else:
-                        action = best_actions[0]
-                    
-                    # Update opponent stats
-                    self.opponent_stats['total_actions'] += 1
-                    if action == 'raise':
-                        self.opponent_stats['aggression_frequency'] = (
-                            (self.opponent_stats['aggression_frequency'] * (self.opponent_stats['total_actions'] - 1) + 1) / 
-                            self.opponent_stats['total_actions']
-                        )
-                    elif action == 'fold':
-                        self.opponent_stats['fold_frequency'] = (
-                            (self.opponent_stats['fold_frequency'] * (self.opponent_stats['total_actions'] - 1) + 1) / 
-                            self.opponent_stats['total_actions']
-                        )
+                    # Don't make consecutive raises
+                    action = 'call' if self.last_action == 'raise' else 'call'
+                
+                # Store last action
+                self.last_action = action
                 
                 # Store state and action for Q-value update
                 self.last_state = state
@@ -624,578 +525,208 @@ class Player:
                 
                 if action == "fold":
                     self.folded = True
-                    print(f"\n❌ {self.name} folds!")
                     return "fold", 0
                 elif action == "raise":
                     raise_amount = min(current_bet + min_raise, self.chips)
                     if raise_amount >= self.chips:
                         raise_amount = self.chips
-                        print(f"\n🔥 {self.name} está ALL-IN!")
-                        print(f"► Apostou seus últimos {raise_amount} chips!")
                         return "raise", raise_amount
                     else:
-                        print(f"\n💰 {self.name} aumenta para {raise_amount} chips!")
                         self.chips -= raise_amount
                         return "raise", raise_amount
                 else:  # call
                     bet_amount = min(current_bet, self.chips)
                     if bet_amount >= self.chips:
                         bet_amount = self.chips
-                        print(f"\n🔥 {self.name} está ALL-IN!")
-                        print(f"► Apostou seus últimos {bet_amount} chips!")
-                    else:
-                        print(f"\n✅ {self.name} pagou {bet_amount} chips")
                     self.chips -= bet_amount
-                    return "call", bet_amount
                     
-            else:
-                # Método atual para jogadores humanos
-                while True:
-                    try:
-                        print(f"\n🎮 SUA VEZ ({self.name})!")
-                        print("-" * 40)
-                        print(f"🎴 Suas cartas: {self.show_hand()}")
-                        if len(community_cards) > 0:
-                            print(f"🎴 Mesa: {', '.join(str(c) for c in community_cards)}")
-                            hand_type, _ = self.get_hand_value(community_cards)
-                            print(f"🃏 Seu melhor jogo: {hand_type}")
-                        print(f"💰 Aposta atual: {current_bet}")
-                        print(f"💰 Seus chips: {self.chips}")
-                        print("-" * 40)
-                        
-                        # Mostra opções disponíveis
-                        print("\nOpções disponíveis:")
-                        if self.chips == 0:
-                            print("❌ Você não tem mais chips para apostar!")
-                            return "fold", 0
-                        
-                        if current_bet >= self.chips:
-                            print("1. (a) 🔥 ALL-IN com", self.chips, "chips")
-                            print("2. (f) ❌ Fold")
-                            action = input("\nEscolha sua ação: ").lower()
-                            if action == 'a' or action == '1':
-                                return "call", self.chips  # All-in
-                            return "fold", 0
-                        
-                        print(f"1. (c) ✅ Call: {current_bet} chips")
-                        if current_bet + min_raise <= self.chips:
-                            print(f"2. (r) 💰 Raise: mínimo {current_bet + min_raise} chips")
-                        else:
-                            print("2. (r) 💰 Raise: indisponível (chips insuficientes)")
-                        print("3. (a) 🔥 ALL-IN com", self.chips, "chips")
-                        print("4. (f) ❌ Fold")
-                        
-                        action = input("\nEscolha sua ação: ").lower()
-                        
-                        if action in ['c', '1']:
-                            bet_amount = min(current_bet, self.chips)
-                            return "call", bet_amount
-                        elif action in ['r', '2']:
-                            if current_bet + min_raise <= self.chips:
-                                raise_amount = current_bet + min_raise
-                                print(f"\nValor mínimo para raise: {raise_amount}")
-                                print(f"Seus chips disponíveis: {self.chips}")
-                                try:
-                                    amount = int(input("Digite o valor do raise (ou 0 para cancelar): "))
-                                    if amount == 0:
-                                        continue
-                                    if amount >= raise_amount and amount <= self.chips:
-                                        return "raise", amount
-                                    else:
-                                        print("❌ Valor inválido!")
-                                except ValueError:
-                                    print("❌ Valor inválido!")
-                            else:
-                                print("❌ Chips insuficientes para raise!")
-                        elif action in ['a', '3']:
-                            return "raise", self.chips  # All-in
-                        elif action in ['f', '4']:
-                            return "fold", 0
-                    except KeyboardInterrupt:
-                        return "fold", 0
-            
-            return "fold", 0
-
-class HistoryManager:
-    def __init__(self, history_file="history.json"):
-        self.history_file = history_file
-        try:
-            with open(self.history_file, "r") as f:
-                self.games = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            self.games = []
-
-    def record_game(self, game_data):
-        self.games.append(game_data)
-        self.save_history()
-
-    def save_history(self):
-        with open(self.history_file, "w") as f:
-            json.dump(self.games, f, indent=4)
-
-class RankingManager:
-    def __init__(self, ranking_file="ranking.json"):
-        self.ranking_file = ranking_file
-        try:
-            with open(self.ranking_file, "r") as f:
-                self.rankings = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            self.rankings = {}
-
-    def update_ranking(self, winner_name):
-        self.rankings[winner_name] = self.rankings.get(winner_name, 0) + 1
-        self.save_ranking()
-
-    def save_ranking(self):
-        with open(self.ranking_file, "w") as f:
-            json.dump(self.rankings, f, indent=4)
+                    # Save Q-table after significant actions
+                    if self.is_machine:
+                        self.save_q_table()
+                    
+                    return "call", bet_amount
 
 class PokerGame:
     def __init__(self, players):
         self.deck = Deck()
+        self.community_cards = []
+        self.pot = 0
+        self.current_bet = 0
+        self.min_raise = 20
         self.players = players
         self.history_manager = HistoryManager()
         self.ranking_manager = RankingManager()
-        self.current_state = "pre-flop"
-        self.community_cards: List[Card] = []
-        self.pot = 0
-        self.current_bet = 50  # Aposta inicial
-        self.min_raise = 50    # Valor mínimo para raise
         
-        # Set player positions
-        for i, player in enumerate(players):
-            player.position = "early" if i == 0 else "late"
-
     def deal_cards(self):
-        # Distribuir 2 cartas para cada jogador, simulando o pré-flop
-        for player in self.players:
-            player.hand = []
-            player.receive_card(self.deck.draw())
-            player.receive_card(self.deck.draw())
-
+        """Deal initial cards to all players"""
+        self.deck = Deck()  # Reset deck
+        self.community_cards = []  # Reset community cards
+        
+        # Deal 2 cards to each player
+        for _ in range(2):
+            for player in self.players:
+                player.receive_card(self.deck.draw())
+    
     def deal_community_cards(self, count: int):
+        """Deal specified number of community cards"""
         for _ in range(count):
             card = self.deck.draw()
             if card:
                 self.community_cards.append(card)
-
-    def show_community_cards(self):
+    
+    def show_community_cards(self) -> str:
+        """Return string representation of community cards"""
         return ", ".join(str(card) for card in self.community_cards)
 
-    def betting_round(self) -> int:
-        round_pot = 0
-        active_players = [p for p in self.players if not p.folded]
-        
-        for player in active_players:
-            print(f"\n👤 {player.name}")
-            print(f"💰 Chips: {player.chips}")
-            if len(self.community_cards) > 0:
-                hand_type, _ = player.get_hand_value(self.community_cards)
-                print(f"🃏 Melhor jogo: {hand_type}")
-                print(f"🎴 Cartas na mão: {player.show_hand()}")
-                print(f"🎴 Mesa: {self.show_community_cards()}")
-            else:
-                print(f"🎴 Cartas na mão: {player.show_hand()}")
-            print("-" * 40)
-            
-            # Verifica situação de all-in
-            if player.chips == 0:
-                player.folded = True
-                print(f"❌ {player.name} não tem mais chips e está fora!")
-                continue
-            
-            # Se o jogador não tem chips suficientes para a aposta mínima
-            is_all_in = player.chips <= self.current_bet
-            if is_all_in:
-                print(f"\n🔥 SITUAÇÃO DE ALL-IN!")
-                print(f"► Aposta necessária: {self.current_bet}")
-                print(f"► Chips disponíveis: {player.chips}")
-            
-            action, bet_amount = player.make_decision(self.community_cards, self.current_bet, self.min_raise)
-            
-            if action == "fold":
-                player.folded = True
-                print(f"\n❌ {player.name} folds!")
-            elif action == "raise":
-                if bet_amount >= player.chips:  # All-in
-                    bet_amount = player.chips
-                    print(f"\n🔥 {player.name} está ALL-IN!")
-                    print(f"► Apostou seus últimos {bet_amount} chips!")
-                else:
-                    print(f"\n💰 {player.name} aumenta para {bet_amount} chips!")
-                
-                player.chips -= bet_amount
-                round_pot += bet_amount
-                self.current_bet = bet_amount
-                
-                # Se alguém deu raise, precisa dar chance dos outros igualarem
-                for other_player in [p for p in active_players if p != player and not p.folded]:
-                    print(f"\n👤 {other_player.name}")
-                    print(f"💰 Chips: {other_player.chips}")
-                    print("-" * 40)
-                    
-                    # Verifica situação de all-in do outro jogador
-                    if other_player.chips == 0:
-                        other_player.folded = True
-                        print(f"❌ {other_player.name} não tem mais chips e está fora!")
-                        continue
-                    
-                    is_all_in = other_player.chips <= self.current_bet
-                    if is_all_in:
-                        print(f"\n🔥 SITUAÇÃO DE ALL-IN!")
-                        print(f"► Aposta necessária: {self.current_bet}")
-                        print(f"► Chips disponíveis: {other_player.chips}")
-                    
-                    response, response_amount = other_player.make_decision(self.community_cards, self.current_bet, self.min_raise)
-                    if response == "fold":
-                        other_player.folded = True
-                        print(f"\n❌ {other_player.name} folds!")
-                    else:  # call
-                        if response_amount >= other_player.chips:  # All-in
-                            response_amount = other_player.chips
-                            print(f"\n🔥 {other_player.name} está ALL-IN!")
-                            print(f"► Apostou seus últimos {response_amount} chips!")
-                        else:
-                            print(f"\n✅ {other_player.name} pagou {response_amount} chips")
-                        
-                        other_player.chips -= response_amount
-                        round_pot += response_amount
-            else:  # call
-                if bet_amount >= player.chips:  # All-in
-                    bet_amount = player.chips
-                    print(f"\n🔥 {player.name} está ALL-IN!")
-                    print(f"► Apostou seus últimos {bet_amount} chips!")
-                else:
-                    print(f"\n✅ {player.name} pagou {bet_amount} chips")
-                
-                player.chips -= bet_amount
-                round_pot += bet_amount
-        
-        return round_pot
+class HistoryManager:
+    def __init__(self):
+        self.history_file = "game_history.json"
+        self.load_history()
 
-    def determine_winner(self) -> Optional[Player]:
-        active_players = [p for p in self.players if not p.folded]
-        if not active_players:
-            return None
+    def load_history(self):
+        try:
+            with open(self.history_file, "r") as f:
+                self.history = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.history = []
+
+    def save_history(self):
+        with open(self.history_file, "w") as f:
+            json.dump(self.history, f, indent=4)
+
+    def record_game(self, game_data):
+        self.history.append(game_data)
+        self.save_history()
+
+class RankingManager:
+    def __init__(self):
+        self.ranking_file = "ranking.json"
+        self.load_ranking()
+
+    def load_ranking(self):
+        try:
+            with open(self.ranking_file, "r") as f:
+                self.ranking = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.ranking = {}
+
+    def save_ranking(self):
+        with open(self.ranking_file, "w") as f:
+            json.dump(self.ranking, f, indent=4)
+
+    def update_ranking(self, winner_name):
+        if winner_name not in self.ranking:
+            self.ranking[winner_name] = 0
+        self.ranking[winner_name] += 1
+        self.save_ranking()
+
+class Game:
+    """Legacy class for machine vs machine games"""
+    def __init__(self):
+        self.deck = Deck()
+        self.community_cards = []
+        self.pot = 0
+        self.current_bet = 0
+        self.min_raise = 20
+        
+    def play_machine_vs_machine(self, num_games: int):
+        self.player1 = Player("Máquina 1", is_machine=True)
+        self.player2 = Player("Máquina 2", is_machine=True)
+        
+        for game in range(num_games):
+            print(f"\n=== Jogo {game + 1} de {num_games} ===")
             
+            # Create a PokerGame instance for this round
+            poker_game = PokerGame([self.player1, self.player2])
+            
+            # Deal cards
+            poker_game.deal_cards()
+            
+            # Set positions
+            self.player1.position = "early"
+            self.player2.position = "late"
+            
+            # Pre-flop
+            print("\n=== Pré-Flop ===")
+            self._betting_round([self.player1, self.player2])
+            
+            if not self.player1.folded and not self.player2.folded:
+                # Flop
+                print("\n=== Flop ===")
+                poker_game.deal_community_cards(3)
+                self.community_cards = poker_game.community_cards
+                self._betting_round([self.player1, self.player2])
+            
+            if not self.player1.folded and not self.player2.folded:
+                # Turn
+                print("\n=== Turn ===")
+                poker_game.deal_community_cards(1)
+                self.community_cards = poker_game.community_cards
+                self._betting_round([self.player1, self.player2])
+            
+            if not self.player1.folded and not self.player2.folded:
+                # River
+                print("\n=== River ===")
+                poker_game.deal_community_cards(1)
+                self.community_cards = poker_game.community_cards
+                self._betting_round([self.player1, self.player2])
+            
+            # Showdown
+            self._showdown([self.player1, self.player2])
+            
+            # Save Q-tables
+            self.player1.save_q_table()
+            self.player2.save_q_table()
+    
+    def _betting_round(self, players: List[Player]):
+        self.current_bet = 0
+        for player in players:
+            if not player.folded:
+                action, amount = player.make_decision(self.community_cards, self.current_bet, self.min_raise)
+                if action == "raise":
+                    self.current_bet = amount
+                self.pot += amount
+    
+    def _showdown(self, players: List[Player]):
+        active_players = [p for p in players if not p.folded]
+        
+        if not active_players:
+            print("\n❌ Todos os jogadores desistiram!")
+            return
+        
         if len(active_players) == 1:
             winner = active_players[0]
-            print(f"\n🏆 {winner.name} vence por desistência!")
-            return winner
+            print(f"\n🏆 {winner.name} vence o pote de {self.pot} chips!")
+            winner.chips += self.pot
+            return
         
-        print("\n" + "="*20 + " SHOWDOWN " + "="*20)
-        max_hand = ("", -1)
-        winner = None
+        # Compare hands
+        hand_values = [(p, p.get_hand_value(self.community_cards)) for p in active_players]
+        if hand_values:  # Only proceed if there are hands to compare
+            best_value = max(hand_values, key=lambda x: x[1][1])
+            winners = [p for p, v in hand_values if v[1] == best_value[1][1]]
         
-        # Mostra as mãos de todos os jogadores ativos
-        print("\n📊 RESULTADO FINAL DAS MÃOS:")
-        for player in active_players:
-            hand_type, value = player.get_hand_value(self.community_cards)
-            print("\n" + "-" * 40)
-            print(f"👤 {player.name}:")
-            print(f"🃏 MELHOR JOGO: {hand_type}")
-            print(f"🎴 Cartas na mão: {player.show_hand()}")
-            print(f"🎴 Cartas da mesa: {self.show_community_cards()}")
-            print("-" * 40)
-            
-            # Atualiza o vencedor se esta mão for melhor
-            if value > max_hand[1]:
-                max_hand = (hand_type, value)
-                winner = player
-        
-        if winner:
-            print(f"\n🏆 {winner.name} vence a mão!")
-            print(f"🃏 Melhor jogo: {max_hand[0]}")
-            print(f"🎴 Cartas do vencedor: {winner.show_hand()}")
-            print(f"🎴 Cartas da mesa: {self.show_community_cards()}")
-        
-        return winner
+        # Split pot among winners
+        split_amount = self.pot // len(winners)
+        for winner in winners:
+            print(f"\n🏆 {winner.name} vence {split_amount} chips com {best_value[1][0]}!")
+            winner.chips += split_amount
 
-    def play(self):
-        print("\n" + "="*50)
-        print("           INICIANDO NOVA MÃO")
-        print("="*50)
-        
-        self.deal_cards()
-        print("\n🎴 MÃOS INICIAIS:")
-        print("-"*30)
-        for player in self.players:
-            print(f"► {player.name}: {player.show_hand()}")
-
-        # Pré-flop
-        print("\n" + "="*20 + " PRÉ-FLOP " + "="*20)
-        self.pot += self.betting_round()
-        
-        # Se todos menos um jogador desistiram, termina o jogo
-        if len([p for p in self.players if not p.folded]) <= 1:
-            winner = self.determine_winner()
-            if winner:
-                print(f"\n🏆 {winner.name} vence por desistência!")
-        else:
-            # Flop
-            print("\n" + "="*22 + " FLOP " + "="*22)
-            self.deal_community_cards(3)
-            print("\n🎴 CARTAS COMUNITÁRIAS:")
-            print("-"*30)
-            print(f"► {self.show_community_cards()}")
-            self.pot += self.betting_round()
-            
-            if len([p for p in self.players if not p.folded]) > 1:
-                # Turn
-                print("\n" + "="*22 + " TURN " + "="*22)
-                self.deal_community_cards(1)
-                print("\n🎴 CARTAS COMUNITÁRIAS:")
-                print("-"*30)
-                print(f"► {self.show_community_cards()}")
-                self.pot += self.betting_round()
-                
-                if len([p for p in self.players if not p.folded]) > 1:
-                    # River
-                    print("\n" + "="*22 + " RIVER " + "="*22)
-                    self.deal_community_cards(1)
-                    print("\n🎴 CARTAS COMUNITÁRIAS:")
-                    print("-"*30)
-                    print(f"► {self.show_community_cards()}")
-                    self.pot += self.betting_round()
-
-        # Calcula taxa e pagamento
-        fee = self.pot * 0.10  # Taxa de 10%
-        payout = self.pot - fee
-
-        # Determina o vencedor
-        winner = self.determine_winner()
-        if winner:
-            winner.chips += payout
-            self.ranking_manager.update_ranking(winner.name)
-            
-            # Atualiza Q-values para máquinas baseado no resultado
-            for player in self.players:
-                if player.is_machine:
-                    # Find opponent
-                    opponent = next(p for p in self.players if p != player)
-                    
-                    # Calculate chip difference relative to opponent
-                    chips_diff = (player.chips - opponent.chips) / 1000  # Normalize by initial chips
-                    
-                    # Track game sequence performance
-                    if not hasattr(player, 'game_sequence'):
-                        player.game_sequence = {
-                            'hands_played': 0,
-                            'total_chip_diff': 0,
-                            'win_streak': 0,
-                            'max_chips': player.chips,
-                            'learning_steps': 0
-                        }
-                    
-                    player.game_sequence['hands_played'] += 1
-                    player.game_sequence['total_chip_diff'] += chips_diff
-                    
-                    if player == winner:
-                        player.game_sequence['win_streak'] += 1
-                    else:
-                        player.game_sequence['win_streak'] = 0
-                    
-                    player.game_sequence['max_chips'] = max(player.game_sequence['max_chips'], player.chips)
-                    
-                    # Calculate sequence-based metrics
-                    avg_chip_diff = player.game_sequence['total_chip_diff'] / player.game_sequence['hands_played']
-                    win_streak_bonus = min(0.1 * player.game_sequence['win_streak'], 0.3)  # Cap at 0.3
-                    chip_retention = player.chips / player.game_sequence['max_chips']
-                    
-                    # Hand strength and position factors
-                    hand_strength = player.evaluate_hand_strength(self.community_cards)
-                    position_multiplier = 1.1 if player.position == "late" else 0.9
-                    
-                    # Action-based components
-                    action_reward = 0.0
-                    if hasattr(player, 'last_action'):
-                        if player.last_action == 'raise':
-                            if chips_diff > 0:  # Reward aggressive play when ahead
-                                action_reward = 0.2
-                            else:  # Smaller reward when behind to encourage comebacks
-                                action_reward = 0.1
-                        elif player.last_action == 'fold':
-                            action_reward = 0.1 if chips_diff < -0.3 else -0.1  # Reward conservative play when significantly behind
-                    
-                    # Combine rewards with emphasis on chip difference and sequence performance
-                    reward = (
-                        0.4 * chips_diff +           # Current hand performance
-                        0.2 * avg_chip_diff +        # Long-term performance
-                        0.15 * win_streak_bonus +    # Consecutive wins bonus
-                        0.15 * chip_retention +      # Bankroll management
-                        0.1 * action_reward          # Action-specific reward
-                    ) * position_multiplier
-                    
-                    # Estado final é o estado atual
-                    final_state = player.get_state(self.community_cards, self.current_bet)
-                    
-                    # Atualiza Q-value para a última ação
-                    if hasattr(player, 'last_state') and hasattr(player, 'last_action'):
-                        player.update_q_value(player.last_state, player.last_action, reward, final_state)
-            
-            result = {
-                "winner": winner.name,
-                "state": self.current_state,
-                "total_pot": self.pot,
-                "fee": fee,
-                "payout": payout,
-                "community_cards": self.show_community_cards(),
-                "players": [{
-                    "name": p.name,
-                    "hand": p.show_hand(),
-                    "chips": p.chips,
-                    "folded": p.folded
-                } for p in self.players]
-            }
-            self.history_manager.record_game(result)
-            print("\n📊 RESULTADO DA PARTIDA:")
-            print("-"*40)
-            print(f"🏆 Vencedor: {result['winner']}")
-            print(f"💰 Pote total: {result['total_pot']}")
-            print(f"💸 Taxa: {result['fee']}")
-            print(f"💵 Pagamento: {result['payout']}")
-            print(f"🎴 Mesa final: {result['community_cards']}")
-            print("\n👥 JOGADORES:")
-            for p in result['players']:
-                print(f"► {p['name']}:")
-                print(f"  Cartas: {p['hand']}")
-                print(f"  Chips: {p['chips']}")
-                print(f"  Status: {'Desistiu' if p['folded'] else 'Jogou até o fim'}")
-                print()
-
-def run_machine_vs_machine_test(num_games=100):
-    """
-    Executa um teste de estratégia entre duas máquinas por um número específico de jogos.
-    """
-    print("\n" + "="*50)
-    print("     TESTE DE ESTRATÉGIA MÁQUINA VS MÁQUINA")
-    print("="*50)
+def main():
+    print("Bem-vindo ao Poker Texas Hold'em!")
+    print("\nEscolha o modo de jogo:")
+    print("1. Humano vs Máquina")
+    print("2. Máquina vs Máquina")
     
-    machine1 = Player("Máquina 1", is_machine=True)
-    machine2 = Player("Máquina 2", is_machine=True)
+    mode = input("\nDigite sua escolha (1-2): ")
     
-    stats = {
-        "Máquina 1": {"wins": 0, "chips_won": 0, "folds": 0},
-        "Máquina 2": {"wins": 0, "chips_won": 0, "folds": 0}
-    }
+    game = Game()
     
-    for game_num in range(1, num_games + 1):
-        print(f"\n📊 Progresso: Jogo {game_num}/{num_games}")
-        print(f"💰 Chips - Máquina 1: {machine1.chips}, Máquina 2: {machine2.chips}")
-        
-        # Reset chips para cada novo jogo para manter consistência
-        machine1.chips = 1000
-        machine2.chips = 1000
-        
-        game = PokerGame([machine1, machine2])
-        game.play()
-        
-        # Registra estatísticas
-        if machine1.folded:
-            stats["Máquina 1"]["folds"] += 1
-        if machine2.folded:
-            stats["Máquina 2"]["folds"] += 1
-            
-        if machine1.chips > machine2.chips:
-            stats["Máquina 1"]["wins"] += 1
-            stats["Máquina 1"]["chips_won"] += (machine1.chips - 1000)
-        else:
-            stats["Máquina 2"]["wins"] += 1
-            stats["Máquina 2"]["chips_won"] += (machine2.chips - 1000)
-            
-        # Salva Q-tables após cada jogo
-        machine1.save_q_table()
-        machine2.save_q_table()
-    
-    # Exibe resultados finais
-    print("\n" + "="*50)
-    print("           RESULTADOS DO TESTE")
-    print("="*50)
-    
-    for machine, results in stats.items():
-        win_rate = (results["wins"] / num_games) * 100
-        avg_chips = results["chips_won"] / num_games
-        fold_rate = (results["folds"] / num_games) * 100
-        print(f"\n► {machine}:")
-        print(f"  Vitórias: {results['wins']} ({win_rate:.1f}%)")
-        print(f"  Média de chips ganhos por jogo: {avg_chips:.1f}")
-        print(f"  Desistências: {results['folds']} ({fold_rate:.1f}%)")
+    if mode == "2":
+        num_games = int(input("\nQuantos jogos simular? "))
+        game.play_machine_vs_machine(num_games)
+    else:
+        print("Modo não implementado ainda.")
 
 if __name__ == "__main__":
-    try:
-        print("\n" + "="*50)
-        print("           TAXAS HOLD'EM")
-        print("="*50)
-        print("\n💫 Bem-vindo ao Taxas Hold'em!")
-        print("🎮 Escolha o modo de jogo:")
-        print("1. Jogador vs Máquina")
-        print("2. Teste Máquina vs Máquina")
-        
-        mode = input("\nDigite o número do modo desejado (1 ou 2): ")
-        
-        if mode == "2":
-            try:
-                games_input = input("Digite o número de jogos para testar (recomendado: 100): ")
-                num_games = int(games_input) if games_input.strip() else 100
-                run_machine_vs_machine_test(num_games)
-            except ValueError:
-                print("\n❌ Valor inválido! Usando valor padrão de 100 jogos.")
-                run_machine_vs_machine_test(100)
-        else:
-            print("\n🎮 O jogo continuará até que um dos jogadores perca todos os seus chips.")
-            player1 = Player("Jogador 1")
-            machine_player = Player("Máquina", is_machine=True)
-            hand_number = 1
-            
-            try:
-                while player1.chips > 0 and machine_player.chips > 0:
-                    print(f"\n" + "="*50)
-                    print(f"             MÃO #{hand_number}")
-                    print("="*50)
-                    print(f"\n💰 CHIPS ATUAIS:")
-                    print("-"*30)
-                    print(f"► Jogador 1: {player1.chips}")
-                    print(f"► Máquina: {machine_player.chips}")
-                    
-                    game = PokerGame([player1, machine_player])
-                    game.play()
-                    hand_number += 1
-                    
-                    # Reset para próxima mão
-                    player1.folded = False
-                    machine_player.folded = False
-                    
-                    try:
-                        input("\n⏩ Pressione Enter para continuar ou Ctrl+C para sair...")
-                    except KeyboardInterrupt:
-                        print("\n❌ Interrupção detectada. Encerrando jogo...")
-                        break
-                
-                # Determina o vencedor do jogo
-                print("\n" + "="*50)
-                print("           FIM DO JOGO")
-                print("="*50)
-                
-                if player1.chips <= 0:
-                    print(f"\n🏆 Jogo encerrado! A Máquina venceu após {hand_number-1} mãos!")
-                elif machine_player.chips <= 0:
-                    print(f"\n🏆 Jogo encerrado! O Jogador 1 venceu após {hand_number-1} mãos!")
-                else:
-                    print("\n❌ Jogo interrompido pelo usuário.")
-                
-                # Salva a Q-table da máquina ao final do jogo
-                machine_player.save_q_table()
-            except KeyboardInterrupt:
-                print("\n❌ Interrupção detectada. Encerrando jogo...")
-                machine_player.save_q_table()
-            
-    except KeyboardInterrupt:
-        print("\n❌ Interrupção detectada. Encerrando jogo...")
-    finally:
-        rm = RankingManager()
-        print("\n📊 RANKING FINAL:")
-        print("-"*30)
-        rankings = rm.rankings
-        sorted_rankings = sorted(rankings.items(), key=lambda x: x[1], reverse=True)
-        for name, wins in sorted_rankings:
-            print(f"► {name}: {wins} vitórias")
+    main()

@@ -4,7 +4,7 @@ Script para testar estratégias de máquinas competindo entre si no jogo de Poke
 """
 
 import random
-from poker_app import Player, PokerGame
+from poker_app import Player, Game
 
 def run_machine_vs_machine_test(num_games=100):
     """
@@ -30,16 +30,20 @@ def run_machine_vs_machine_test(num_games=100):
         machine1.chips = 1000
         machine2.chips = 1000
         
-        game = PokerGame([machine1, machine2])
-        game.play()
+        game = Game()
+        game.play_machine_vs_machine(1)  # Play one game at a time
+        
+        # Get the machines from the game since it creates its own
+        game_machine1 = next(p for p in [game.player1, game.player2] if p.name == "Máquina 1")
+        game_machine2 = next(p for p in [game.player1, game.player2] if p.name == "Máquina 2")
         
         # Registrar estatísticas
-        if machine1.chips > machine2.chips:
+        if game_machine1.chips > game_machine2.chips:
             stats["Máquina 1"]["vitórias"] += 1
-            stats["Máquina 1"]["chips_ganhos"] += (machine1.chips - 1000)
+            stats["Máquina 1"]["chips_ganhos"] += (game_machine1.chips - 1000)
         else:
             stats["Máquina 2"]["vitórias"] += 1
-            stats["Máquina 2"]["chips_ganhos"] += (machine2.chips - 1000)
+            stats["Máquina 2"]["chips_ganhos"] += (game_machine2.chips - 1000)
     
     # Exibir resultados finais
     print("\n" + "="*50)
