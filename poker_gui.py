@@ -348,7 +348,7 @@ class PokerGUI:
             if self.machine.folded:
                 self.end_hand("Jogador 1")
                 return
-                
+            
             self.betting_round_complete = True  # Mark betting round as complete after both players have acted
             self.update_display()
             self.check_game_state()
@@ -377,6 +377,7 @@ class PokerGUI:
         else:  # call
             bet_amount = min(self.current_bet, self.machine.chips)
             self.machine.chips -= bet_amount
+            self.player.chips -= bet_amount
             self.game.pot += bet_amount
             self.log_message(f"Máquina: Call {bet_amount}")
 
@@ -412,6 +413,7 @@ class PokerGUI:
 
     def end_hand(self, winner_by_fold=None):
         """End the current hand and update session stats"""
+        print("end_hand called")
         if winner_by_fold:
             winner_name = winner_by_fold
             self.log_message(f"\n🏆 {winner_name} vence por desistência!")
@@ -419,19 +421,17 @@ class PokerGUI:
             # Determina o vencedor baseado nas mãos
             player_type, player_value = self.player.get_hand_value(self.game.community_cards)
             machine_type, machine_value = self.machine.get_hand_value(self.game.community_cards)
-            
+
             result = f"\nJogador 1 tem {player_type}\nMáquina tem {machine_type}\n"
-            
+
             if player_value > machine_value:
                 winner_name = "Jogador 1"
-                self.player.chips += self.game.pot
             else:
                 winner_name = "Máquina"
-                self.machine.chips += self.game.pot
-            
+
             result += f"🏆 {winner_name} vence!"
             self.log_message(result)
-        
+
         # Update session stats
         self.hands_played += 1
         if winner_name == "Jogador 1":
@@ -440,7 +440,18 @@ class PokerGUI:
         else:
             self.machine_wins += 1
             self.current_streak = min(-1, self.current_streak - 1)
-        
+
+        # Award the pot to the winner
+        print(f"\n💰 Antes do pagamento - Jogador 1: {self.player.chips}, Máquina: {self.machine.chips}, Pote: {self.game.pot}")
+        if winner_name == "Jogador 1":
+            self.player.chips += self.game.pot
+        else:
+            self.machine.chips += self.game.pot
+
+        print(f"\n💰 Depos do pagamento - Jogador 1: {self.player.chips}, Máquina: {self.machine.chips}, Pote: {self.game.pot}")
+        # Log chip counts after pot is awarded
+        self.log_message(f"\n💰 Depois do pagamento - Jogador 1: {self.player.chips}, Máquina: {self.machine.chips} chips")
+
         # Registra o resultado
         self.game.history_manager.record_game({
             "winner": winner_name,
@@ -449,10 +460,10 @@ class PokerGUI:
             "player_hand": self.player.show_hand(),
             "machine_hand": self.machine.show_hand()
         })
-        
+
         # Atualiza o ranking
         self.game.ranking_manager.update_ranking(winner_name)
-        
+
         # Show session stats
         self.log_message(f"\n=== Estatísticas da Sessão ===")
         self.log_message(f"Mãos jogadas: {self.hands_played}")
@@ -462,29 +473,32 @@ class PokerGUI:
         streak_count = abs(self.current_streak)
         if streak_count > 1:
             self.log_message(f"🔥 {streak_owner} está em uma sequência de {streak_count} vitórias!")
-        
+
         # Show chips
         self.log_message(f"\nJogador 1: {self.player.chips} chips")
         self.log_message(f"Máquina: {self.machine.chips} chips")
-        
+
+        # Update display to reflect chip changes
+        self.update_display()
+
         # Check if session should end
         if self.player.chips <= 0:
             self.log_message("\n🏆 Máquina vence a sessão! Jogador ficou sem chips.")
             self.disable_all_buttons()
             return
-        elif self.machine.chips <= 0:
+        if self.machine.chips <= 0:
             self.log_message("\n🏆 Jogador vence a sessão! Máquina ficou sem chips.")
             self.disable_all_buttons()
             return
-        elif self.player.chips >= self.target_chips:
+        if self.player.chips >= self.target_chips:
             self.log_message(f"\n🏆 Jogador vence a sessão! Alcançou {self.target_chips} chips!")
             self.disable_all_buttons()
             return
-        elif self.machine.chips >= self.target_chips:
+        if self.machine.chips >= self.target_chips:
             self.log_message(f"\n🏆 Máquina vence a sessão! Alcançou {self.target_chips} chips!")
             self.disable_all_buttons()
             return
-        
+
         # Continue to next hand
         self.log_message("\nPressione 'Próxima Mão' para continuar")
         self.new_game_button.config(state='normal')

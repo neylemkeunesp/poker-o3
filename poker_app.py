@@ -32,8 +32,8 @@ class Card:
         'Spades': 'Espadas'
     }
     ranks_pt = {
-        '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8',
-        '9': '9', '10': '10', 'J': 'Valete', 'Q': 'Dama', 'K': 'Rei', 'A': 'Ás'
+        '2': '2', '3': '3', '4': '4', '5': '5', '6': 6, '7': 7, '8': 8,
+        '9': 9, '10': 10, 'J': 'Valete', 'Q': 'Dama', 'K': 'Rei', 'A': 'Ás'
     }
     suits = ['Hearts', 'Diamonds', 'Clubs', 'Spades']
     ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
@@ -138,7 +138,7 @@ class Player:
                 if values_with_low_ace[i:i+5] == list(range(values_with_low_ace[i], values_with_low_ace[i]+5)):
                     straight = True
                     straight_high = values_with_low_ace[i+4]
-                    break
+                break
         
         # Verifica flush e straight flush
         flush_suit = None
@@ -320,7 +320,7 @@ class Player:
         hand_strength = self.evaluate_hand_strength(community_cards)
         chips_ratio = self.chips / 1000
         bet_ratio = current_bet / self.chips if self.chips > 0 else 1
-        pot_odds = current_bet / (current_bet + self.chips) if current_bet > 0 else 0
+        pot_odds = current_bet / (current_bet + self.chips) if self.chips > 0 else 0
         
         # Game phase with more detail
         if len(community_cards) == 0:
@@ -404,33 +404,13 @@ class Player:
                 'hands_played': 0,
                 'total_chip_diff': 0,
                 'win_streak': 0,
-                'max_chips': self.chips,
+                'max_chips': self.chips,  # Initialize with starting chips
                 'learning_steps': 0
             }
         
         self.game_sequence['learning_steps'] += 1
         
         # Adaptive learning rate based on sequence performance
-        base_learning_rate = self.learning_rate
-        if self.game_sequence['hands_played'] > 0:
-            # Adjust learning rate based on performance trend
-            avg_chip_diff = self.game_sequence['total_chip_diff'] / self.game_sequence['hands_played']
-            performance_factor = 1.0 + (avg_chip_diff * 0.3)  # Reduced performance impact
-            win_streak_factor = 1.0 + (min(self.game_sequence['win_streak'] * 0.05, 0.3))  # Reduced win streak bonus
-            
-            # More aggressive learning rate decay
-            time_decay = max(0.3, 1.0 / (1 + 0.001 * self.game_sequence['learning_steps']))  # Faster decay
-            
-            adaptive_learning_rate = base_learning_rate * performance_factor * win_streak_factor * time_decay
-            learning_rate = min(0.3, max(0.01, adaptive_learning_rate))  # Lower maximum learning rate
-        else:
-            learning_rate = base_learning_rate
-        
-        # Enhanced temporal difference calculation
-        current_q = self.q_table[state][action]
-        next_max_q = max(self.q_table[next_state].values())
-        
-        # Adjust discount factor based on game stage and performance
         base_discount = self.discount_factor
         if hasattr(self, 'chips'):
             chips_ratio = self.chips / 1000  # Normalize by initial chips
@@ -452,16 +432,6 @@ class Player:
         for s in self.q_table:
             if s not in self.eligibility_traces:
                 self.eligibility_traces[s] = {'fold': 0, 'call': 0, 'raise': 0}
-            for a in self.eligibility_traces[s]:
-                self.eligibility_traces[s][a] *= trace_decay
-        
-        # Set eligibility trace for current state-action pair
-        if state not in self.eligibility_traces:
-            self.eligibility_traces[state] = {'fold': 0, 'call': 0, 'raise': 0}
-        self.eligibility_traces[state][action] = 1.0
-        
-        # Update all state-action pairs according to their eligibility
-        for s in self.q_table:
             for a in self.q_table[s]:
                 if s in self.eligibility_traces:
                     update = learning_rate * temporal_diff * self.eligibility_traces[s][a]
@@ -706,27 +676,18 @@ class Game:
             best_value = max(hand_values, key=lambda x: x[1][1])
             winners = [p for p, v in hand_values if v[1] == best_value[1][1]]
         
-        # Split pot among winners
-        split_amount = self.pot // len(winners)
-        for winner in winners:
-            print(f"\n🏆 {winner.name} vence {split_amount} chips com {best_value[1][0]}!")
-            winner.chips += split_amount
+        # Award the pot without any chip rebalancing
+        print(f"\n💰 Antes da redistribuição - Jogador 1: {players[0].chips}, Máquina: {players[1].chips}, Pote: {self.pot}")
+        if len(winners) == 1:
+            winner = winners[0]
+            print(f"\n🏆 {winner.name} vence {self.pot} chips com {best_value[1][0]}!")
+            winner.chips += self.pot
+        else:
+            # Split pot among winners
+            split_amount = self.pot // len(winners)
+            for winner in winners:
+                print(f"\n🏆 {winner.name} vence {split_amount} chips com {best_value[1][0]}!")
+                winner.chips += split_amount
 
-def main():
-    print("Bem-vindo ao Poker Texas Hold'em!")
-    print("\nEscolha o modo de jogo:")
-    print("1. Humano vs Máquina")
-    print("2. Máquina vs Máquina")
-    
-    mode = input("\nDigite sua escolha (1-2): ")
-    
-    game = Game()
-    
-    if mode == "2":
-        num_games = int(input("\nQuantos jogos simular? "))
-        game.play_machine_vs_machine(num_games)
-    else:
-        print("Modo não implementado ainda.")
-
-if __name__ == "__main__":
-    main()
+        self.pot = 0  # Clear the pot after distribution
+        print("end_hand called")
