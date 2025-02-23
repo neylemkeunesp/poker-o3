@@ -10,7 +10,7 @@ class PokerGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Taxas Hold'em Poker")
-        self.root.geometry("1024x800")  # Increased height for better fit
+        self.root.geometry("1178x920")  # Increased size by 15% for better fit
         self.root.configure(bg='#1a472a')  # Verde escuro para tema de poker
         
         # Initialize card graphics
@@ -118,6 +118,18 @@ class PokerGUI:
         self.log_text.insert(tk.END, message + "\n")
         self.log_text.see(tk.END)  # Scroll to bottom
         self.root.update()
+        
+    def log_chip_state(self, action):
+        """Log the current state of all chips and verify conservation"""
+        total = self.player.chips + self.machine.chips + self.game.pot
+        message = f"\n[{action}]\n"
+        message += f"Jogador: {self.player.chips} chips\n"
+        message += f"Máquina: {self.machine.chips} chips\n"
+        message += f"Pote: {self.game.pot} chips\n"
+        message += f"Total: {total} chips"
+        if total != 2000:
+            message += f" ⚠️ ERRO: Total deveria ser 2000!"
+        self.log_message(message)
 
     def setup_components(self):
         # Labels para cartas comunitárias
@@ -127,6 +139,15 @@ class PokerGUI:
             font=('Arial', 14, 'bold')
         )
         self.community_label.pack(anchor='center')
+
+        # Add Stats button
+        self.stats_button = ttk.Button(
+            self.community_frame,
+            text="Estatísticas",
+            command=self.show_statistics,
+            width=15
+        )
+        self.stats_button.pack(side='right', padx=5)
         
         # Labels para cartas do oponente
         self.opponent_label = ttk.Label(
@@ -222,9 +243,32 @@ class PokerGUI:
         self.machine_wins = 0
         self.current_streak = 0
         
-        # Reset player states with starting chips
-        self.player.chips = self.starting_chips
-        self.machine.chips = self.starting_chips
+        # Reset player states with starting chips and statistics
+        for player in [self.player, self.machine]:
+            player.chips = self.starting_chips
+            player.game_sequence = {
+                'hands_played': 0,
+                'total_chip_diff': 0,
+                'win_streak': 0,
+                'max_chips': self.starting_chips,
+                'learning_steps': 0,
+                'hand_frequencies': {
+                    'Royal Flush': 0,
+                    'Straight Flush': 0,
+                    'Quadra': 0,
+                    'Full House': 0,
+                    'Flush': 0,
+                    'Sequência': 0,
+                    'Trinca': 0,
+                    'Dois Pares': 0,
+                    'Par': 0,
+                    'Carta Alta': 0
+                },
+                'total_winnings': 0,
+                'total_losses': 0,
+                'best_hand': None,
+                'biggest_pot_won': 0
+            }
         
         # Clear log
         self.log_text.delete(1.0, tk.END)
@@ -247,17 +291,50 @@ class PokerGUI:
         self.machine.folded = False
         self.betting_round_complete = False  # Reset betting round flag
         
-        # Initialize new game
-        self.game = PokerGame([self.player, self.machine])
-        self.current_bet = 50  # Small blind + big blind
-        
-        # Deal initial cards
-        self.game.deal_cards()
-        
         # Log hand start
         self.log_message("\n=== Nova Mão ===")
         self.log_message(f"Jogador 1: {self.player.chips} chips")
         self.log_message(f"Máquina: {self.machine.chips} chips")
+        
+        # Initialize new game
+        self.game = PokerGame([self.player, self.machine])
+        
+        # Set up blinds
+        small_blind = 25
+        big_blind = 50
+        
+        # Log initial state
+        self.log_message("\nEstado inicial da mão:")
+        self.log_chip_state("Início da mão")
+        
+        # Post blinds and update chips
+        self.player.chips -= small_blind  # Player is small blind
+        self.machine.chips -= big_blind   # Machine is big blind
+        self.game.pot = small_blind + big_blind
+        self.current_bet = big_blind
+        
+        # Log state after blinds
+        self.log_message("\nDepois dos blinds:")
+        self.log_chip_state("Blinds postados")
+        
+        # Update hands played counter
+        self.player.game_sequence['hands_played'] += 1
+        self.machine.game_sequence['hands_played'] += 1
+        
+        # Update chip difference tracking
+        self.player.game_sequence['total_chip_diff'] = self.player.chips - self.starting_chips
+        self.machine.game_sequence['total_chip_diff'] = self.machine.chips - self.starting_chips
+        
+        # Update max chips tracking
+        self.player.game_sequence['max_chips'] = max(self.player.game_sequence['max_chips'], self.player.chips)
+        self.machine.game_sequence['max_chips'] = max(self.machine.game_sequence['max_chips'], self.machine.chips)
+        
+        # Log blinds
+        self.log_message(f"Jogador 1 posta small blind: {small_blind}")
+        self.log_message(f"Máquina posta big blind: {big_blind}")
+        
+        # Deal initial cards
+        self.game.deal_cards()
         
         # Update display and enable buttons
         self.update_display()
@@ -308,11 +385,23 @@ class PokerGUI:
                 label._image = None
 
     def call_action(self):
-        bet_amount = min(self.current_bet, self.player.chips)
-        self.player.chips -= bet_amount
-        self.game.pot += bet_amount
+        # Log before state
+        self.log_message(f"\nAntes do Call/Check:")
+        self.log_chip_state("Estado Inicial")
         
-        self.log_message(f"Jogador: Call {bet_amount}")
+        if self.current_bet > 0:
+            # Calculate how much more the player needs to add to match the current bet
+            player_current_bet = self.starting_chips - self.player.chips
+            additional_bet = self.current_bet - player_current_bet
+            
+            if additional_bet > 0 and additional_bet <= self.player.chips:
+                self.player.chips -= additional_bet
+                self.game.pot += additional_bet
+                self.log_message(f"Jogador: Call {additional_bet}")
+                self.log_chip_state("Jogador Call")
+        else:
+            self.log_message("Jogador: Check")
+            self.log_chip_state("Jogador Check")
         
         # Update game state before machine action
         self.update_display()
@@ -330,13 +419,18 @@ class PokerGUI:
         self.check_game_state()
 
     def raise_action(self):
-        raise_amount = self.current_bet + self.game.min_raise
-        if raise_amount <= self.player.chips:
-            self.player.chips -= raise_amount
-            self.game.pot += raise_amount
-            self.current_bet = raise_amount
+        # Calculate total amount needed (current bet + raise)
+        player_current_bet = self.starting_chips - self.player.chips
+        additional_bet = self.current_bet - player_current_bet
+        total_amount = additional_bet + self.game.min_raise
+        
+        if total_amount <= self.player.chips:
+            self.player.chips -= total_amount
+            self.game.pot += total_amount
+            self.current_bet = self.current_bet + self.game.min_raise
             
-            self.log_message(f"Jogador: Raise para {raise_amount}")
+            self.log_message(f"Jogador: Raise para {total_amount}")
+            self.log_chip_state("Jogador Raise")
             
             # Update game state before machine action
             self.update_display()
@@ -362,6 +456,14 @@ class PokerGUI:
         self.disable_buttons()
 
     def machine_action(self):
+        # Store initial state
+        initial_machine_chips = self.machine.chips
+        initial_pot = self.game.pot
+        
+        # Log before state
+        self.log_message(f"\nAntes do Call/Check da Máquina:")
+        self.log_chip_state("Estado Inicial")
+        
         action, amount = self.machine.make_decision(self.game.community_cards, self.current_bet, self.game.min_raise)
         
         if action == "fold":
@@ -369,17 +471,31 @@ class PokerGUI:
             self.log_message("Máquina: Fold")
             return
         elif action == "raise":
-            self.machine.chips -= amount
-            self.game.pot += amount
-            self.current_bet = amount
-            self.log_message(f"Máquina: Raise para {amount}")
-            self.betting_round_complete = False  # Reset if machine raises
+            if amount <= initial_machine_chips:  # Can afford raise
+                # Calculate total amount needed (current bet + raise)
+                total_amount = self.game.min_raise
+                
+                if total_amount <= initial_machine_chips:
+                    self.machine.chips = initial_machine_chips - total_amount
+                    self.game.pot = initial_pot + total_amount
+                    self.current_bet = self.current_bet + self.game.min_raise
+                    
+                    self.log_message(f"Máquina: Raise para {total_amount}")
+                    self.log_chip_state("Máquina Raise")
+                    self.betting_round_complete = False  # Reset if machine raises
         else:  # call
-            bet_amount = min(self.current_bet, self.machine.chips)
-            self.machine.chips -= bet_amount
-            self.player.chips -= bet_amount
-            self.game.pot += bet_amount
-            self.log_message(f"Máquina: Call {bet_amount}")
+            if self.current_bet > 0:
+                # Calculate how much more the machine needs to add to match the current bet
+                bet_to_call = min(self.current_bet, initial_machine_chips)
+                
+                if bet_to_call > 0:
+                    self.machine.chips = initial_machine_chips - bet_to_call
+                    self.game.pot = initial_pot + bet_to_call
+                    self.log_message(f"Máquina: Call {bet_to_call}")
+                    self.log_chip_state("Máquina Call")
+            else:
+                self.log_message("Máquina: Check")
+                self.log_chip_state("Máquina Check")
 
     def check_game_state(self):
         # Only proceed if both players have acted
@@ -392,20 +508,41 @@ class PokerGUI:
             
         # Verifica se é hora de revelar novas cartas comunitárias
         if len(self.game.community_cards) == 0:
+            # Log state before dealing flop
+            self.log_message("\nAntes do Flop:")
+            self.log_chip_state("Estado antes do Flop")
+            
             self.game.deal_community_cards(3)  # Flop
             self.log_message("\n=== Flop ===")
-            self.current_bet = self.game.min_raise  # Reset bet for new round
+            self.current_bet = 0  # Reset bet for new round
             self.betting_round_complete = False  # Reset for new betting round
+            
+            # Log state after dealing flop
+            self.log_chip_state("Estado após o Flop")
         elif len(self.game.community_cards) == 3:
+            # Log state before dealing turn
+            self.log_message("\nAntes do Turn:")
+            self.log_chip_state("Estado antes do Turn")
+            
             self.game.deal_community_cards(1)  # Turn
             self.log_message("\n=== Turn ===")
-            self.current_bet = self.game.min_raise  # Reset bet for new round
+            self.current_bet = 0  # Reset bet for new round
             self.betting_round_complete = False  # Reset for new betting round
+            
+            # Log state after dealing turn
+            self.log_chip_state("Estado após o Turn")
         elif len(self.game.community_cards) == 4:
+            # Log state before dealing river
+            self.log_message("\nAntes do River:")
+            self.log_chip_state("Estado antes do River")
+            
             self.game.deal_community_cards(1)  # River
             self.log_message("\n=== River ===")
-            self.current_bet = self.game.min_raise  # Reset bet for new round
+            self.current_bet = 0  # Reset bet for new round
             self.betting_round_complete = False  # Reset for new betting round
+            
+            # Log state after dealing river
+            self.log_chip_state("Estado após o River")
         elif len(self.game.community_cards) == 5:
             self.end_hand()  # Only end hand after River betting is complete
         
@@ -441,24 +578,52 @@ class PokerGUI:
             self.machine_wins += 1
             self.current_streak = min(-1, self.current_streak - 1)
 
-        # Award the pot to the winner
+        # Award the pot and update statistics
         print(f"\n💰 Antes do pagamento - Jogador 1: {self.player.chips}, Máquina: {self.machine.chips}, Pote: {self.game.pot}")
         if winner_name == "Jogador 1":
-            self.player.chips += self.game.pot
+            pot_amount = self.game.pot
+            self.player.chips += pot_amount
+            self.player.game_sequence['total_winnings'] += pot_amount
+            self.machine.game_sequence['total_losses'] += pot_amount
+            if pot_amount > self.player.game_sequence['biggest_pot_won']:
+                self.player.game_sequence['biggest_pot_won'] = pot_amount
+            self.game.pot = 0  # Zero the pot after distributing
+            self.log_chip_state("Jogador vence o pote")
         else:
-            self.machine.chips += self.game.pot
+            pot_amount = self.game.pot
+            self.machine.chips += pot_amount
+            self.machine.game_sequence['total_winnings'] += pot_amount
+            self.player.game_sequence['total_losses'] += pot_amount
+            if pot_amount > self.machine.game_sequence['biggest_pot_won']:
+                self.machine.game_sequence['biggest_pot_won'] = pot_amount
+            self.game.pot = 0  # Zero the pot after distributing
+            self.log_chip_state("Máquina vence o pote")
 
-        print(f"\n💰 Depos do pagamento - Jogador 1: {self.player.chips}, Máquina: {self.machine.chips}, Pote: {self.game.pot}")
+        print(f"\n💰 Depois do pagamento - Jogador 1: {self.player.chips}, Máquina: {self.machine.chips}, Pote: {self.game.pot}")
         # Log chip counts after pot is awarded
         self.log_message(f"\n💰 Depois do pagamento - Jogador 1: {self.player.chips}, Máquina: {self.machine.chips} chips")
 
-        # Registra o resultado
+        # Registra o resultado com estatísticas detalhadas
         self.game.history_manager.record_game({
             "winner": winner_name,
             "pot": self.game.pot,
             "community_cards": self.game.show_community_cards(),
             "player_hand": self.player.show_hand(),
-            "machine_hand": self.machine.show_hand()
+            "machine_hand": self.machine.show_hand(),
+            "player_stats": {
+                "hand_frequencies": self.player.game_sequence['hand_frequencies'],
+                "total_winnings": self.player.game_sequence['total_winnings'],
+                "total_losses": self.player.game_sequence['total_losses'],
+                "best_hand": self.player.game_sequence['best_hand'],
+                "biggest_pot_won": self.player.game_sequence['biggest_pot_won']
+            },
+            "machine_stats": {
+                "hand_frequencies": self.machine.game_sequence['hand_frequencies'],
+                "total_winnings": self.machine.game_sequence['total_winnings'],
+                "total_losses": self.machine.game_sequence['total_losses'],
+                "best_hand": self.machine.game_sequence['best_hand'],
+                "biggest_pot_won": self.machine.game_sequence['biggest_pot_won']
+            }
         })
 
         # Atualiza o ranking
@@ -521,8 +686,81 @@ class PokerGUI:
         self.disable_buttons()
         self.new_game_button.config(state='disabled')
         self.new_session_button.config(state='normal')
+        
+    def show_statistics(self):
+        """Show detailed player statistics in a new window"""
+        stats_window = tk.Toplevel(self.root)
+        stats_window.title("Estatísticas do Jogador")
+        stats_window.geometry("600x400")
+        stats_window.configure(bg='#1a472a')
+        
+        # Create notebook for tabs
+        notebook = ttk.Notebook(stats_window)
+        notebook.pack(expand=True, fill='both', padx=10, pady=10)
+        
+        # Player tab
+        player_frame = ttk.Frame(notebook)
+        notebook.add(player_frame, text='Jogador 1')
+        
+        # Machine tab
+        machine_frame = ttk.Frame(notebook)
+        notebook.add(machine_frame, text='Máquina')
+        
+        # Add statistics to each tab
+        for player, frame in [('Jogador 1', player_frame), ('Máquina', machine_frame)]:
+            player_obj = self.player if player == 'Jogador 1' else self.machine
+            stats = player_obj.game_sequence
+            
+            # Create scrollable frame
+            canvas = tk.Canvas(frame, bg='#1a472a')
+            scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+            scrollable_frame = ttk.Frame(canvas)
+            
+            scrollable_frame.bind(
+                "<Configure>",
+                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            )
+            
+            canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+            
+            # Basic stats
+            ttk.Label(scrollable_frame, text="Estatísticas Básicas", font=('Arial', 12, 'bold')).pack(pady=5)
+            ttk.Label(scrollable_frame, text=f"Mãos Jogadas: {stats['hands_played']}").pack()
+            ttk.Label(scrollable_frame, text=f"Ganhos Totais: {stats['total_winnings']}").pack()
+            ttk.Label(scrollable_frame, text=f"Perdas Totais: {stats['total_losses']}").pack()
+            
+            # Best hand
+            if stats['best_hand']:
+                hand_type, value = stats['best_hand']
+                ttk.Label(scrollable_frame, text=f"Melhor Mão: {hand_type} ({value})").pack()
+            
+            ttk.Label(scrollable_frame, text=f"Maior Pote Ganho: {stats['biggest_pot_won']}").pack()
+            
+            # Hand frequencies
+            ttk.Label(scrollable_frame, text="\nFrequência de Mãos", font=('Arial', 12, 'bold')).pack(pady=5)
+            for hand_type, freq in stats['hand_frequencies'].items():
+                ttk.Label(scrollable_frame, text=f"{hand_type}: {freq}").pack()
+            
+            # Pack scrollbar and canvas
+            scrollbar.pack(side="right", fill="y")
+            canvas.pack(side="left", fill="both", expand=True)
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = PokerGUI(root)
-    root.mainloop()
+    try:
+        print("Iniciando aplicação...")
+        import os
+        os.environ['DISPLAY'] = ':0'  # Usa a configuração que funcionou
+        root = tk.Tk()
+        app = PokerGUI(root)
+        print("Interface gráfica inicializada")
+        print("Iniciando loop principal...")
+        root.mainloop()
+    except Exception as e:
+        print(f"Erro ao iniciar aplicação: {e}")
+        print("\nPor favor, certifique-se de que:")
+        print("1. VcXsrv está instalado e rodando no Windows")
+        print("2. XLaunch foi configurado com 'Disable access control'")
+        print("3. Firewall do Windows permite conexões do WSL")
+        import traceback
+        traceback.print_exc()
