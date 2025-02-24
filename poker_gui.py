@@ -105,17 +105,42 @@ class PokerGUI:
         self.log_frame = ttk.Frame(self.main_container)
         self.log_frame.pack(pady=10, fill='both', expand=True)
         
-        # Text widget para log
-        self.log_text = tk.Text(self.log_frame, height=6, bg='#0f2819', fg='white', wrap=tk.WORD)
-        self.log_text.pack(fill='both', expand=True, padx=10)
+        # Text widget para log com estilo melhorado
+        self.log_text = tk.Text(
+            self.log_frame,
+            height=4,  # Altura reduzida
+            bg='#0a1f12',  # Verde mais escuro para melhor contraste
+            fg='#e0e0e0',  # Cinza claro para melhor legibilidade
+            wrap=tk.WORD,
+            font=('Consolas', 10),  # Fonte monoespaçada para melhor leitura
+            padx=8,  # Padding interno horizontal
+            pady=5,  # Padding interno vertical
+            relief='solid',  # Borda sólida
+            borderwidth=1  # Borda fina
+        )
+        self.log_text.pack(fill='both', expand=True, padx=15, pady=5)
+        
+        # Configurar tags para diferentes tipos de mensagens
+        self.log_text.tag_configure('header', font=('Consolas', 10, 'bold'))
+        self.log_text.tag_configure('winner', foreground='#90EE90')  # Verde claro
+        self.log_text.tag_configure('chips', foreground='#FFD700')   # Dourado
         
         # Frame para controles
         self.control_frame = ttk.Frame(self.main_container)
         self.control_frame.pack(pady=5, fill='x', side='bottom')
 
-    def log_message(self, message):
-        """Add a message to the game log"""
-        self.log_text.insert(tk.END, message + "\n")
+    def log_message(self, message, tag=None):
+        """Add a message to the game log with optional formatting"""
+        # Aplicar tags específicas baseado no conteúdo da mensagem
+        if message.startswith('==='):
+            self.log_text.insert(tk.END, message + "\n", 'header')
+        elif '🏆' in message:
+            self.log_text.insert(tk.END, message + "\n", 'winner')
+        elif 'chips' in message.lower() or '💰' in message:
+            self.log_text.insert(tk.END, message + "\n", 'chips')
+        else:
+            self.log_text.insert(tk.END, message + "\n", tag)
+            
         self.log_text.see(tk.END)  # Scroll to bottom
         self.root.update()
         
