@@ -9,7 +9,7 @@ from card_graphics import CardGraphics
 class PokerGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Taxas Hold'em Poker")
+        self.root.title("Texas Hold'em Poker")
         self.root.geometry("1178x920")  # Increased size by 15% for better fit
         self.root.configure(bg='#1a472a')  # Verde escuro para tema de poker
         

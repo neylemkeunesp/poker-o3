@@ -1,0 +1,16 @@
+# GUI e Imagens
+Pillow>=10.0.0  # Para manipulação de imagens e gráficos de cartas
+
+# Computação Numérica
+numpy>=1.24.0  # Para cálculos e operações numéricas
+
+# Bibliotecas Padrão (não precisam ser instaladas)
+# tkinter - vem com Python
+# json - vem com Python
+# os - vem com Python
+# random - vem com Python
+# unittest - vem com Python
+
+# Ambiente de Desenvolvimento
+pytest>=7.0.0  # Para executar os testes
+pytest-cov>=4.1.0  # Para relatórios de cobertura de testes
