@@ -10,7 +10,7 @@ class PokerGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Texas Hold'em Poker")
-        self.root.geometry("1178x920")  # Increased size by 15% for better fit
+        self.root.geometry("1280x1024")  # Larger window to ensure all elements are visible
         self.root.configure(bg='#1a472a')  # Verde escuro para tema de poker
         
         # Initialize card graphics
@@ -52,9 +52,27 @@ class PokerGUI:
         self.start_new_session()
 
     def setup_frames(self):
+        # Banner para fase das apostas
+        self.phase_banner_frame = tk.Frame(
+            self.main_container,
+            bg='#0a1f12',  # Verde escuro
+            height=40
+        )
+        self.phase_banner_frame.pack(fill='x', pady=(0, 5))
+        
+        # Label para mostrar a fase atual
+        self.phase_label = tk.Label(
+            self.phase_banner_frame,
+            text="FASE: PRÉ-FLOP",
+            font=('Arial', 16, 'bold'),
+            fg='#FFD700',  # Dourado
+            bg='#0a1f12'   # Verde escuro
+        )
+        self.phase_label.pack(fill='both', expand=True)
+        
         # Frame superior para cartas comunitárias
         self.community_frame = ttk.Frame(self.main_container)
-        self.community_frame.pack(pady=10, fill='x')
+        self.community_frame.pack(pady=5, fill='x')
         
         # Frame para imagens das cartas comunitárias
         self.community_cards_frame = ttk.Frame(self.community_frame)
@@ -101,62 +119,326 @@ class PokerGUI:
             label.pack(side='left', padx=5)
             self.player_card_labels.append(label)
         
-        # Frame para log do jogo
-        self.log_frame = ttk.Frame(self.main_container)
-        self.log_frame.pack(pady=10, fill='both', expand=True)
-        
-        # Text widget para log com estilo melhorado
-        self.log_text = tk.Text(
-            self.log_frame,
-            height=4,  # Altura reduzida
-            bg='#0a1f12',  # Verde mais escuro para melhor contraste
-            fg='#e0e0e0',  # Cinza claro para melhor legibilidade
-            wrap=tk.WORD,
-            font=('Consolas', 10),  # Fonte monoespaçada para melhor leitura
-            padx=8,  # Padding interno horizontal
-            pady=5,  # Padding interno vertical
-            relief='solid',  # Borda sólida
-            borderwidth=1  # Borda fina
-        )
-        self.log_text.pack(fill='both', expand=True, padx=15, pady=5)
-        
-        # Configurar tags para diferentes tipos de mensagens
-        self.log_text.tag_configure('header', font=('Consolas', 10, 'bold'))
-        self.log_text.tag_configure('winner', foreground='#90EE90')  # Verde claro
-        self.log_text.tag_configure('chips', foreground='#FFD700')   # Dourado
-        
-        # Frame para controles
+        # Frame para botões
         self.control_frame = ttk.Frame(self.main_container)
         self.control_frame.pack(pady=5, fill='x', side='bottom')
-
-    def log_message(self, message, tag=None):
-        """Add a message to the game log with optional formatting"""
-        # Aplicar tags específicas baseado no conteúdo da mensagem
-        if message.startswith('==='):
-            self.log_text.insert(tk.END, message + "\n", 'header')
-        elif '🏆' in message:
-            self.log_text.insert(tk.END, message + "\n", 'winner')
-        elif 'chips' in message.lower() or '💰' in message:
-            self.log_text.insert(tk.END, message + "\n", 'chips')
-        else:
-            self.log_text.insert(tk.END, message + "\n", tag)
-            
-        self.log_text.see(tk.END)  # Scroll to bottom
-        self.root.update()
         
-    def log_chip_state(self, action):
-        """Log the current state of all chips and verify conservation"""
-        total = self.player.chips + self.machine.chips + self.game.pot
-        message = f"\n[{action}]\n"
-        message += f"Jogador: {self.player.chips} chips\n"
-        message += f"Máquina: {self.machine.chips} chips\n"
-        message += f"Pote: {self.game.pot} chips\n"
-        message += f"Total: {total} chips"
-        if total != 2000:
-            message += f" ⚠️ ERRO: Total deveria ser 2000!"
-        self.log_message(message)
+        # Frame para painel de informações do jogo (com altura limitada)
+        self.info_panel_frame = ttk.Frame(self.main_container)
+        self.info_panel_frame.pack(pady=5, fill='both', expand=True)
+        
+        # Definir altura para o painel de informações
+        self.info_panel_frame.config(height=230)  # Aumentado para mostrar mais conteúdo
+        
+        # Criar notebook para abas de informações
+        self.info_notebook = ttk.Notebook(self.info_panel_frame)
+        self.info_notebook.pack(fill='both', expand=True, padx=15, pady=5)
+        
+        # Aba de histórico de ações
+        self.action_history_frame = ttk.Frame(self.info_notebook)
+        self.info_notebook.add(self.action_history_frame, text="Histórico de Ações")
+        
+        # Aba de estatísticas da mão atual
+        self.hand_stats_frame = ttk.Frame(self.info_notebook)
+        self.info_notebook.add(self.hand_stats_frame, text="Estatísticas da Mão")
+        
+        # Aba de chips e apostas
+        self.chips_frame = ttk.Frame(self.info_notebook)
+        self.info_notebook.add(self.chips_frame, text="Estatísticas")
+        
+        # Configurar o frame de histórico de ações
+        self.action_history_canvas = tk.Canvas(
+            self.action_history_frame,
+            bg='#0a1f12',
+            highlightthickness=0,
+            height=180  # Aumentado para mostrar mais mensagens
+        )
+        self.action_history_scrollbar = ttk.Scrollbar(
+            self.action_history_frame,
+            orient="vertical",
+            command=self.action_history_canvas.yview
+        )
+        self.action_history_scrollable_frame = ttk.Frame(self.action_history_canvas)
+        
+        self.action_history_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.action_history_canvas.configure(scrollregion=self.action_history_canvas.bbox("all"))
+        )
+        
+        self.action_history_canvas.create_window(
+            (0, 0),
+            window=self.action_history_scrollable_frame,
+            anchor="nw"
+        )
+        self.action_history_canvas.configure(yscrollcommand=self.action_history_scrollbar.set)
+        
+        self.action_history_scrollbar.pack(side="right", fill="y")
+        self.action_history_canvas.pack(side="left", fill="both", expand=True)
+        
+        # Configurar o frame de estatísticas da mão
+        self.hand_stats_content = ttk.Frame(self.hand_stats_frame)
+        self.hand_stats_content.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Estatísticas da mão atual
+        self.player_hand_type_label = ttk.Label(
+            self.hand_stats_content,
+            text="Sua mão: -",
+            font=('Arial', 12, 'bold')
+        )
+        self.player_hand_type_label.pack(anchor='w', pady=5)
+        
+        self.machine_hand_type_label = ttk.Label(
+            self.hand_stats_content,
+            text="Mão da máquina: -",
+            font=('Arial', 12, 'bold')
+        )
+        self.machine_hand_type_label.pack(anchor='w', pady=5)
+        
+        self.hand_progress_label = ttk.Label(
+            self.hand_stats_content,
+            text="Progresso da mão:",
+            font=('Arial', 12)
+        )
+        self.hand_progress_label.pack(anchor='w', pady=5)
+        
+        # Barra de progresso da mão
+        self.hand_progress_frame = ttk.Frame(self.hand_stats_content)
+        self.hand_progress_frame.pack(fill='x', pady=5)
+        
+        self.hand_stages = ["Pré-Flop", "Flop", "Turn", "River", "Showdown"]
+        self.hand_stage_labels = []
+        
+        for stage in self.hand_stages:
+            stage_frame = ttk.Frame(self.hand_progress_frame)
+            stage_frame.pack(side='left', expand=True, fill='x')
+            
+            stage_indicator = ttk.Label(
+                stage_frame,
+                text="○",
+                font=('Arial', 14),
+                foreground='#888888'
+            )
+            stage_indicator.pack(anchor='center')
+            
+            stage_label = ttk.Label(
+                stage_frame,
+                text=stage,
+                font=('Arial', 9)
+            )
+            stage_label.pack(anchor='center')
+            
+            self.hand_stage_labels.append((stage_indicator, stage_label))
+        
+        # Configurar o frame de chips e apostas
+        self.chips_content = ttk.Frame(self.chips_frame)
+        self.chips_content.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Visualização de chips
+        self.player_chips_frame = ttk.Frame(self.chips_content)
+        self.player_chips_frame.pack(fill='x', pady=10)
+        
+        self.player_chips_label = ttk.Label(
+            self.player_chips_frame,
+            text="Seus Chips:",
+            font=('Arial', 12)
+        )
+        self.player_chips_label.pack(side='left', padx=5)
+        
+        self.player_chips_value = ttk.Label(
+            self.player_chips_frame,
+            text="1000",
+            font=('Arial', 12, 'bold'),
+            foreground='#FFD700'  # Dourado
+        )
+        self.player_chips_value.pack(side='left', padx=5)
+        
+        self.player_chips_progress = ttk.Progressbar(
+            self.player_chips_frame,
+            orient='horizontal',
+            length=200,
+            mode='determinate'
+        )
+        self.player_chips_progress.pack(side='left', padx=10, expand=True, fill='x')
+        
+        # Visualização de chips da máquina
+        self.machine_chips_frame = ttk.Frame(self.chips_content)
+        self.machine_chips_frame.pack(fill='x', pady=10)
+        
+        self.machine_chips_label = ttk.Label(
+            self.machine_chips_frame,
+            text="Chips da Máquina:",
+            font=('Arial', 12)
+        )
+        self.machine_chips_label.pack(side='left', padx=5)
+        
+        self.machine_chips_value = ttk.Label(
+            self.machine_chips_frame,
+            text="1000",
+            font=('Arial', 12, 'bold'),
+            foreground='#FFD700'  # Dourado
+        )
+        self.machine_chips_value.pack(side='left', padx=5)
+        
+        self.machine_chips_progress = ttk.Progressbar(
+            self.machine_chips_frame,
+            orient='horizontal',
+            length=200,
+            mode='determinate'
+        )
+        self.machine_chips_progress.pack(side='left', padx=10, expand=True, fill='x')
+        
+        # Visualização do pote
+        self.pot_frame = ttk.Frame(self.chips_content)
+        self.pot_frame.pack(fill='x', pady=10)
+        
+        self.pot_label = ttk.Label(
+            self.pot_frame,
+            text="Pote Atual:",
+            font=('Arial', 12)
+        )
+        self.pot_label.pack(side='left', padx=5)
+        
+        self.pot_value = ttk.Label(
+            self.pot_frame,
+            text="0",
+            font=('Arial', 14, 'bold'),
+            foreground='#FFD700'  # Dourado
+        )
+        self.pot_value.pack(side='left', padx=5)
+        
+        # Histórico de mensagens (invisível, apenas para armazenar)
+        self.message_history = []
+
+    def add_chip_displays(self):
+        """Adiciona caixas de texto para exibir chips dos jogadores e o pote"""
+        # Remover elementos antigos, se existirem
+        for widget in self.info_frame.winfo_children():
+            widget.destroy()
+            
+        # Frame superior com chips da máquina e pote
+        top_chips_frame = tk.Frame(self.info_frame, bg='#1a472a')
+        top_chips_frame.pack(fill='x', pady=5)
+        
+        # Box de chips da máquina
+        self.machine_chips_box = tk.Frame(
+            top_chips_frame,
+            bg='#233729',
+            highlightbackground='#FFD700',
+            highlightthickness=2,
+            padx=10,
+            pady=5
+        )
+        self.machine_chips_box.pack(side='left', padx=20)
+        
+        tk.Label(
+            self.machine_chips_box,
+            text="MÁQUINA",
+            font=('Arial', 10, 'bold'),
+            fg='white',
+            bg='#233729'
+        ).pack(anchor='w')
+        
+        self.machine_chips_display = tk.Label(
+            self.machine_chips_box,
+            text="1000 💰",
+            font=('Arial', 14, 'bold'),
+            fg='#FFD700',
+            bg='#233729'
+        )
+        self.machine_chips_display.pack(anchor='w')
+        
+        # Box do pote
+        self.pot_box = tk.Frame(
+            top_chips_frame,
+            bg='#233729',
+            highlightbackground='#FF9900',
+            highlightthickness=2,
+            padx=10,
+            pady=5
+        )
+        self.pot_box.pack(side='right', padx=20)
+        
+        tk.Label(
+            self.pot_box,
+            text="POTE",
+            font=('Arial', 10, 'bold'),
+            fg='white',
+            bg='#233729'
+        ).pack(anchor='e')
+        
+        self.pot_display = tk.Label(
+            self.pot_box,
+            text="0 💰",
+            font=('Arial', 14, 'bold'),
+            fg='#FF9900',
+            bg='#233729'
+        )
+        self.pot_display.pack(anchor='e')
+        
+        # Frame inferior com chips do jogador e aposta atual
+        bottom_chips_frame = tk.Frame(self.info_frame, bg='#1a472a')
+        bottom_chips_frame.pack(fill='x', pady=5)
+        
+        # Box de chips do jogador
+        self.player_chips_box = tk.Frame(
+            bottom_chips_frame,
+            bg='#233729',
+            highlightbackground='#FFD700',
+            highlightthickness=2,
+            padx=10,
+            pady=5
+        )
+        self.player_chips_box.pack(side='left', padx=20)
+        
+        tk.Label(
+            self.player_chips_box,
+            text="SEUS CHIPS",
+            font=('Arial', 10, 'bold'),
+            fg='white',
+            bg='#233729'
+        ).pack(anchor='w')
+        
+        self.player_chips_display = tk.Label(
+            self.player_chips_box,
+            text="1000 💰",
+            font=('Arial', 14, 'bold'),
+            fg='#FFD700',
+            bg='#233729'
+        )
+        self.player_chips_display.pack(anchor='w')
+        
+        # Box de aposta atual
+        self.current_bet_box = tk.Frame(
+            bottom_chips_frame,
+            bg='#233729',
+            highlightbackground='#90EE90',
+            highlightthickness=2,
+            padx=10,
+            pady=5
+        )
+        self.current_bet_box.pack(side='right', padx=20)
+        
+        tk.Label(
+            self.current_bet_box,
+            text="APOSTA ATUAL",
+            font=('Arial', 10, 'bold'),
+            fg='white',
+            bg='#233729'
+        ).pack(anchor='e')
+        
+        self.current_bet_display = tk.Label(
+            self.current_bet_box,
+            text="50 💰",
+            font=('Arial', 14, 'bold'),
+            fg='#90EE90',
+            bg='#233729'
+        )
+        self.current_bet_display.pack(anchor='e')
 
     def setup_components(self):
+        # Adiciona displays de chips em text boxes
+        self.add_chip_displays()
+        
         # Labels para cartas comunitárias
         self.community_label = ttk.Label(
             self.community_frame,
@@ -182,30 +464,10 @@ class PokerGUI:
         )
         self.opponent_label.pack(anchor='center')
         
-        # Labels para informações do jogo
-        info_container = ttk.Frame(self.info_frame)
-        info_container.pack(anchor='center')
-        
-        self.pot_label = ttk.Label(
-            info_container,
-            text="Pote: 0",
-            font=('Arial', 12)
-        )
-        self.pot_label.pack(side='left', padx=10)
-        
-        self.bet_label = ttk.Label(
-            info_container,
-            text="Aposta Atual: 50",
-            font=('Arial', 12)
-        )
-        self.bet_label.pack(side='left', padx=10)
-        
-        self.chips_label = ttk.Label(
-            info_container,
-            text="Seus Chips: 1000",
-            font=('Arial', 12)
-        )
-        self.chips_label.pack(side='left', padx=10)
+        # Cria referências vazias para compatibilidade
+        self.pot_label = ttk.Label(text="")
+        self.bet_label = ttk.Label(text="")
+        self.chips_label = ttk.Label(text="")
         
         # Labels para cartas do jogador
         self.player_label = ttk.Label(
@@ -217,48 +479,259 @@ class PokerGUI:
         
         # Container para botões
         button_container = ttk.Frame(self.control_frame)
-        button_container.pack(anchor='center', pady=5)
+        button_container.pack(anchor='center', pady=10)  # Increased padding
         
-        # Botões de controle
+        # Botões de controle - com tamanhos maiores
         self.call_button = ttk.Button(
             button_container,
             text="Call",
             command=self.call_action,
-            width=15
+            width=16  # Increased width
         )
-        self.call_button.pack(side='left', padx=5)
+        self.call_button.pack(side='left', padx=8)  # Increased padding
         
         self.raise_button = ttk.Button(
             button_container,
             text="Raise",
             command=self.raise_action,
-            width=15
+            width=16  # Increased width
         )
-        self.raise_button.pack(side='left', padx=5)
+        self.raise_button.pack(side='left', padx=8)  # Increased padding
         
         self.fold_button = ttk.Button(
             button_container,
             text="Fold",
             command=self.fold_action,
-            width=15
+            width=16  # Increased width
         )
-        self.fold_button.pack(side='left', padx=5)
+        self.fold_button.pack(side='left', padx=8)  # Increased padding
         
         self.new_game_button = ttk.Button(
             button_container,
             text="Próxima Mão",
             command=self.new_hand,
-            width=15
+            width=16  # Increased width
         )
-        self.new_game_button.pack(side='left', padx=5)
+        self.new_game_button.pack(side='left', padx=8)  # Increased padding
         
         self.new_session_button = ttk.Button(
             button_container,
             text="Nova Sessão",
             command=self.start_new_session,
-            width=15
+            width=16  # Increased width
         )
-        self.new_session_button.pack(side='left', padx=5)
+        self.new_session_button.pack(side='left', padx=8)  # Increased padding
+
+    def log_message(self, message, tag=None):
+        """Add a message to the game log with optional formatting"""
+        # Armazenar a mensagem no histórico
+        self.message_history.append((message, tag))
+        
+        # Determinar o ícone e cor baseado no conteúdo da mensagem
+        icon = "🔄"  # Ícone padrão
+        bg_color = "#0a1f12"  # Cor de fundo padrão
+        fg_color = "#e0e0e0"  # Cor de texto padrão
+        
+        if message.startswith('==='):
+            icon = "📌"
+            bg_color = "#1a3a2a"
+        elif '🏆' in message:
+            icon = "🏆"
+            bg_color = "#2a3a1a"
+            fg_color = "#90EE90"  # Verde claro
+        elif 'chips' in message.lower() or '💰' in message:
+            icon = "💰"
+            bg_color = "#3a2a1a"
+            fg_color = "#FFD700"  # Dourado
+        elif 'Jogador: Call' in message or 'Máquina: Call' in message:
+            icon = "✅"
+        elif 'Jogador: Raise' in message or 'Máquina: Raise' in message:
+            icon = "⬆️"
+        elif 'Fold' in message:
+            icon = "❌"
+        elif 'Flop' in message:
+            icon = "🃏"
+        elif 'Turn' in message:
+            icon = "🃏"
+        elif 'River' in message:
+            icon = "🃏"
+            
+        # Criar um frame para a mensagem (usando tk.Frame em vez de ttk.Frame para facilitar a configuração de cores)
+        message_frame = tk.Frame(
+            self.action_history_scrollable_frame,
+            background=bg_color,
+            padx=5,
+            pady=2
+        )
+        message_frame.pack(fill='x', pady=2, padx=5)
+        
+        # Adicionar ícone
+        icon_label = tk.Label(
+            message_frame,
+            text=icon,
+            font=('Arial', 12),
+            foreground=fg_color,
+            background=bg_color
+        )
+        icon_label.pack(side='left', padx=5)
+        
+        # Adicionar texto da mensagem
+        text_label = tk.Label(
+            message_frame,
+            text=message,
+            wraplength=400,
+            foreground=fg_color,
+            background=bg_color,
+            justify='left',
+            anchor='w'
+        )
+        text_label.pack(side='left', padx=5, fill='x', expand=True)
+        
+        # Rolar para o final
+        self.action_history_canvas.update_idletasks()
+        self.action_history_canvas.yview_moveto(1.0)
+        self.root.update()
+        
+        # Atualizar estatísticas da mão se necessário
+        self.update_hand_stats(message)
+        
+    def log_chip_state(self, action):
+        """Log the current state of all chips and verify conservation"""
+        total = self.player.chips + self.machine.chips + self.game.pot
+        message = f"\n[{action}]\n"
+        message += f"Jogador: {self.player.chips} chips\n"
+        message += f"Máquina: {self.machine.chips} chips\n"
+        message += f"Pote: {self.game.pot} chips\n"
+        message += f"Total: {total} chips"
+        if total != 2000:
+            message += f" ⚠️ ERRO: Total deveria ser 2000!"
+        self.log_message(message)
+        
+        # Atualizar visualização de chips
+        self.update_chips_display()
+        
+    def update_chips_display(self):
+        """Atualiza a visualização de chips em todos os locais"""
+        # Atualizar valores de chips nos novos displays
+        if hasattr(self, 'player_chips_display'):
+            self.player_chips_display.config(text=f"{self.player.chips} 💰")
+        if hasattr(self, 'machine_chips_display'):
+            self.machine_chips_display.config(text=f"{self.machine.chips} 💰")
+        if hasattr(self, 'pot_display'):
+            self.pot_display.config(text=f"{self.game.pot} 💰")
+        if hasattr(self, 'current_bet_display'):
+            self.current_bet_display.config(text=f"{self.current_bet} 💰")
+        
+        # Atualizar valores nas estatísticas (tab)
+        self.player_chips_value.config(text=str(self.player.chips))
+        self.machine_chips_value.config(text=str(self.machine.chips))
+        self.pot_value.config(text=str(self.game.pot))
+        
+        # Atualizar barras de progresso
+        target = self.target_chips
+        self.player_chips_progress['value'] = (self.player.chips / target) * 100
+        self.machine_chips_progress['value'] = (self.machine.chips / target) * 100
+        
+    def update_hand_stats(self, message):
+        """Atualiza as estatísticas da mão atual baseado nas mensagens de log"""
+        # Atualizar tipo de mão do jogador
+        if "Jogador 1 tem " in message and "\n" in message:
+            hand_type = message.split("Jogador 1 tem ")[1].split("\n")[0]
+            self.player_hand_type_label.config(text=f"Sua mão: {hand_type}")
+            
+        # Atualizar tipo de mão da máquina
+        if "Máquina tem " in message and "\n" in message:
+            hand_type = message.split("Máquina tem ")[1].split("\n")[0]
+            self.machine_hand_type_label.config(text=f"Mão da máquina: {hand_type}")
+            
+        # Atualizar progresso da mão
+        if "=== Flop ===" in message:
+            self.update_hand_progress(1)  # Flop
+        elif "=== Turn ===" in message:
+            self.update_hand_progress(2)  # Turn
+        elif "=== River ===" in message:
+            self.update_hand_progress(3)  # River
+        elif "🏆" in message and "vence" in message:
+            self.update_hand_progress(4)  # Showdown
+        elif "=== Nova Mão ===" in message:
+            self.update_hand_progress(0)  # Pré-Flop
+            
+    def update_phase_banner(self, stage_index):
+        """Atualiza o banner com a fase atual do jogo"""
+        phases = ["PRÉ-FLOP", "FLOP", "TURN", "RIVER", "SHOWDOWN"]
+        if 0 <= stage_index < len(phases):
+            self.phase_label.config(text=f"FASE: {phases[stage_index]}")
+            
+            # Cores diferentes para cada fase
+            colors = {
+                0: ("#FFD700", "#0a1f12"),  # Dourado sobre verde escuro (Pré-Flop)
+                1: ("#90EE90", "#0a1f12"),  # Verde claro sobre verde escuro (Flop)
+                2: ("#87CEEB", "#0a1f12"),  # Azul claro sobre verde escuro (Turn)
+                3: ("#FFA07A", "#0a1f12"),  # Salmão sobre verde escuro (River)
+                4: ("#FF6347", "#0a1f12"),  # Tomate sobre verde escuro (Showdown)
+            }
+            
+            fg_color, bg_color = colors.get(stage_index, ("#FFFFFF", "#0a1f12"))
+            self.phase_label.config(fg=fg_color, bg=bg_color)
+            self.phase_banner_frame.config(bg=bg_color)
+    
+    def update_hand_progress(self, stage_index):
+        """Atualiza os indicadores de progresso da mão"""
+        # Resetar todos os indicadores para não selecionados
+        for i, (indicator, label) in enumerate(self.hand_stage_labels):
+            if i <= stage_index:
+                # Estágio atual ou anterior
+                indicator.config(text="●", foreground="#FFD700")  # Dourado
+                label.config(foreground="#FFD700")
+            else:
+                # Estágio futuro
+                indicator.config(text="○", foreground="#888888")
+                label.config(foreground="#888888")
+                
+        # Atualizar o banner da fase
+        self.update_phase_banner(stage_index)
+
+    def update_display(self):
+        # Atualiza cartas comunitárias
+        for i, label in enumerate(self.community_card_labels):
+            if i < len(self.game.community_cards):
+                card = self.game.community_cards[i]
+                image = self.card_graphics.get_card_image(card.rank, card.suit)
+                label.configure(image=image)
+                label._image = image  # Keep a reference
+            else:
+                label.configure(image='')
+                label._image = None
+        
+        # Atualiza cartas do oponente
+        for i, label in enumerate(self.opponent_card_labels):
+            if i < len(self.machine.hand):
+                # Only show machine's cards if game ended naturally (all community cards revealed), betting is complete, and no one folded
+                if (self.game and len(self.game.community_cards) == 5 and 
+                    self.betting_round_complete and not any(p.folded for p in self.game.players)):
+                    card = self.machine.hand[i]
+                    image = self.card_graphics.get_card_image(card.rank, card.suit)
+                else:
+                    image = self.card_back
+                label.configure(image=image)
+                label._image = image
+            else:
+                label.configure(image='')
+                label._image = None
+        
+        # Atualiza informações do jogo nos textboxes
+        self.update_chips_display()
+        
+        # Atualiza cartas do jogador
+        for i, label in enumerate(self.player_card_labels):
+            if i < len(self.player.hand):
+                card = self.player.hand[i]
+                image = self.card_graphics.get_card_image(card.rank, card.suit)
+                label.configure(image=image)
+                label._image = image
+            else:
+                label.configure(image='')
+                label._image = None
 
     def start_new_session(self):
         """Start a new poker session"""
@@ -296,7 +769,17 @@ class PokerGUI:
             }
         
         # Clear log
-        self.log_text.delete(1.0, tk.END)
+        # Limpar histórico de mensagens
+        self.message_history.clear()
+        
+        # Limpar widgets de histórico de ações
+        for widget in self.action_history_scrollable_frame.winfo_children():
+            widget.destroy()
+            
+        # Resetar estatísticas da mão
+        self.player_hand_type_label.config(text="Sua mão: -")
+        self.machine_hand_type_label.config(text="Mão da máquina: -")
+        self.update_hand_progress(0)  # Resetar progresso da mão
         
         # Log session start
         self.log_message("=== Nova Sessão de Poker ===")
@@ -315,6 +798,9 @@ class PokerGUI:
         self.machine.hand = []
         self.machine.folded = False
         self.betting_round_complete = False  # Reset betting round flag
+        
+        # Inicializar o banner de fase para PRÉ-FLOP
+        self.update_phase_banner(0)
         
         # Log hand start
         self.log_message("\n=== Nova Mão ===")
@@ -364,50 +850,6 @@ class PokerGUI:
         # Update display and enable buttons
         self.update_display()
         self.enable_buttons()
-
-    def update_display(self):
-        # Atualiza cartas comunitárias
-        for i, label in enumerate(self.community_card_labels):
-            if i < len(self.game.community_cards):
-                card = self.game.community_cards[i]
-                image = self.card_graphics.get_card_image(card.rank, card.suit)
-                label.configure(image=image)
-                label._image = image  # Keep a reference
-            else:
-                label.configure(image='')
-                label._image = None
-        
-        # Atualiza cartas do oponente
-        for i, label in enumerate(self.opponent_card_labels):
-            if i < len(self.machine.hand):
-                # Only show machine's cards if game ended naturally (all community cards revealed), betting is complete, and no one folded
-                if (self.game and len(self.game.community_cards) == 5 and 
-                    self.betting_round_complete and not any(p.folded for p in self.game.players)):
-                    card = self.machine.hand[i]
-                    image = self.card_graphics.get_card_image(card.rank, card.suit)
-                else:
-                    image = self.card_back
-                label.configure(image=image)
-                label._image = image
-            else:
-                label.configure(image='')
-                label._image = None
-        
-        # Atualiza informações do jogo
-        self.pot_label.config(text=f"Pote: {self.game.pot}")
-        self.bet_label.config(text=f"Aposta Atual: {self.current_bet}")
-        self.chips_label.config(text=f"Seus Chips: {self.player.chips}")
-        
-        # Atualiza cartas do jogador
-        for i, label in enumerate(self.player_card_labels):
-            if i < len(self.player.hand):
-                card = self.player.hand[i]
-                image = self.card_graphics.get_card_image(card.rank, card.suit)
-                label.configure(image=image)
-                label._image = image
-            else:
-                label.configure(image='')
-                label._image = None
 
     def call_action(self):
         # Log before state
