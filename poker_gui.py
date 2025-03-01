@@ -40,6 +40,10 @@ class PokerGUI:
         self.current_bet = 50
         self.betting_round_complete = False  # New flag to track betting round completion
         
+        # Rastreamento de apostas na mão atual
+        self.player_bet_in_round = 0
+        self.machine_bet_in_round = 0
+        
         # Session tracking
         self.hands_played = 0
         self.player_wins = 0
@@ -818,11 +822,19 @@ class PokerGUI:
         self.log_message("\nEstado inicial da mão:")
         self.log_chip_state("Início da mão")
         
+        # Reset apostas da rodada
+        self.player_bet_in_round = 0
+        self.machine_bet_in_round = 0
+        
         # Post blinds and update chips
         self.player.chips -= small_blind  # Player is small blind
         self.machine.chips -= big_blind   # Machine is big blind
         self.game.pot = small_blind + big_blind
         self.current_bet = big_blind
+        
+        # Atualiza apostas da rodada
+        self.player_bet_in_round = small_blind
+        self.machine_bet_in_round = big_blind
         
         # Log state after blinds
         self.log_message("\nDepois dos blinds:")
@@ -858,16 +870,16 @@ class PokerGUI:
         
         if self.current_bet > 0:
             # Calculate how much more the player needs to add to match the current bet
-            player_current_bet = self.starting_chips - self.player.chips
-            additional_bet = self.current_bet - player_current_bet
+            additional_bet = self.machine_bet_in_round - self.player_bet_in_round
             
             if additional_bet > 0 and additional_bet <= self.player.chips:
                 self.player.chips -= additional_bet
                 self.game.pot += additional_bet
-                self.log_message(f"Jogador: Call {additional_bet}")
+                self.player_bet_in_round += additional_bet
+                self.log_message(f"Jogador: Call {additional_bet} (Total na rodada: {self.player_bet_in_round})")
                 self.log_chip_state("Jogador Call")
         else:
-            self.log_message("Jogador: Check")
+            self.log_message(f"Jogador: Check (Total na rodada: {self.player_bet_in_round})")
             self.log_chip_state("Jogador Check")
         
         # Update game state before machine action
@@ -886,17 +898,19 @@ class PokerGUI:
         self.check_game_state()
 
     def raise_action(self):
-        # Calculate total amount needed (current bet + raise)
-        player_current_bet = self.starting_chips - self.player.chips
-        additional_bet = self.current_bet - player_current_bet
-        total_amount = additional_bet + self.game.min_raise
+        # Primeiro, o jogador precisa igualar a aposta atual
+        call_amount = self.machine_bet_in_round - self.player_bet_in_round
+        # Depois, adiciona o valor do raise
+        raise_amount = self.game.min_raise
+        total_amount = call_amount + raise_amount
         
         if total_amount <= self.player.chips:
             self.player.chips -= total_amount
             self.game.pot += total_amount
-            self.current_bet = self.current_bet + self.game.min_raise
+            self.player_bet_in_round += total_amount
+            self.current_bet = self.player_bet_in_round
             
-            self.log_message(f"Jogador: Raise para {total_amount}")
+            self.log_message(f"Jogador: Raise para {total_amount} (Total na rodada: {self.player_bet_in_round})")
             self.log_chip_state("Jogador Raise")
             
             # Update game state before machine action
@@ -939,29 +953,35 @@ class PokerGUI:
             return
         elif action == "raise":
             if amount <= initial_machine_chips:  # Can afford raise
-                # Calculate total amount needed (current bet + raise)
-                total_amount = self.game.min_raise
+                # Primeiro, a máquina precisa igualar a aposta atual
+                call_amount = self.player_bet_in_round - self.machine_bet_in_round
+                # Depois, adiciona o valor do raise
+                raise_amount = self.game.min_raise
+                total_amount = call_amount + raise_amount
                 
                 if total_amount <= initial_machine_chips:
                     self.machine.chips = initial_machine_chips - total_amount
                     self.game.pot = initial_pot + total_amount
-                    self.current_bet = self.current_bet + self.game.min_raise
+                    self.machine_bet_in_round += total_amount
+                    self.current_bet = self.machine_bet_in_round
                     
-                    self.log_message(f"Máquina: Raise para {total_amount}")
+                    self.log_message(f"Máquina: Raise para {total_amount} (Total na rodada: {self.machine_bet_in_round})")
                     self.log_chip_state("Máquina Raise")
                     self.betting_round_complete = False  # Reset if machine raises
         else:  # call
             if self.current_bet > 0:
                 # Calculate how much more the machine needs to add to match the current bet
-                bet_to_call = min(self.current_bet, initial_machine_chips)
+                call_amount = self.player_bet_in_round - self.machine_bet_in_round
                 
-                if bet_to_call > 0:
-                    self.machine.chips = initial_machine_chips - bet_to_call
-                    self.game.pot = initial_pot + bet_to_call
-                    self.log_message(f"Máquina: Call {bet_to_call}")
+                if call_amount > 0:
+                    call_amount = min(call_amount, initial_machine_chips)
+                    self.machine.chips = initial_machine_chips - call_amount
+                    self.game.pot = initial_pot + call_amount
+                    self.machine_bet_in_round += call_amount
+                    self.log_message(f"Máquina: Call {call_amount} (Total na rodada: {self.machine_bet_in_round})")
                     self.log_chip_state("Máquina Call")
             else:
-                self.log_message("Máquina: Check")
+                self.log_message(f"Máquina: Check (Total na rodada: {self.machine_bet_in_round})")
                 self.log_chip_state("Máquina Check")
 
     def check_game_state(self):
@@ -982,6 +1002,8 @@ class PokerGUI:
             self.game.deal_community_cards(3)  # Flop
             self.log_message("\n=== Flop ===")
             self.current_bet = 0  # Reset bet for new round
+            self.player_bet_in_round = 0  # Reset player bet for new round
+            self.machine_bet_in_round = 0  # Reset machine bet for new round
             self.betting_round_complete = False  # Reset for new betting round
             
             # Log state after dealing flop
@@ -1217,7 +1239,101 @@ if __name__ == "__main__":
     try:
         print("Iniciando aplicação...")
         import os
-        os.environ['DISPLAY'] = ':0'  # Usa a configuração que funcionou
+        import socket
+        
+        # Verifica se o usuário definiu manualmente o DISPLAY
+        if 'DISPLAY' in os.environ:
+            print(f"Usando DISPLAY definido pelo usuário: {os.environ['DISPLAY']}")
+        else:
+            # Tenta obter o IP do host Windows a partir do WSL
+            try:
+                # Método 1: Tenta obter o IP do host Windows usando o comando ip route
+                try:
+                    import subprocess
+                    result = subprocess.run(['ip', 'route'], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        # Procura pela rota padrão
+                        for line in result.stdout.splitlines():
+                            if 'default via' in line:
+                                # O IP após "default via" é geralmente o IP do host Windows
+                                wsl2_host_ip = line.split('default via ')[1].split(' ')[0]
+                                os.environ['DISPLAY'] = f'{wsl2_host_ip}:0.0'
+                                print(f"Configurando DISPLAY via ip route: {os.environ['DISPLAY']}")
+                                break
+                except Exception as e:
+                    print(f"Não foi possível obter o IP via ip route: {e}")
+                    
+                # Método 2: Obtém o IP do host Windows do arquivo /etc/resolv.conf
+                if 'DISPLAY' not in os.environ:
+                    with open('/etc/resolv.conf', 'r') as f:
+                        for line in f:
+                            if 'nameserver' in line:
+                                wsl2_host_ip = line.strip().split(' ')[1]
+                                os.environ['DISPLAY'] = f'{wsl2_host_ip}:0.0'
+                                print(f"Configurando DISPLAY via resolv.conf: {os.environ['DISPLAY']}")
+                                break
+            except:
+                try:
+                    # Método alternativo - tenta obter o hostname
+                    hostname = socket.gethostname()
+                    ip_addr = socket.gethostbyname(hostname)
+                    os.environ['DISPLAY'] = f'{ip_addr}:0.0'
+                    print(f"Configurando DISPLAY via hostname: {os.environ['DISPLAY']}")
+                except:
+                    # Fallback para configurações comuns
+                    print("Não foi possível determinar o IP automaticamente")
+                    print("Tentando configurações alternativas para DISPLAY")
+                    
+                    # Tenta várias configurações comuns para o DISPLAY
+                    display_options = [
+                        ':0',                  # Display local padrão
+                        '127.0.0.1:0.0',       # Localhost
+                        'localhost:0.0',       # Localhost por nome
+                        '172.17.0.1:0.0',      # IP comum do Docker host
+                        '192.168.1.1:0.0',     # IP comum de rede local
+                        # IPs específicos para WSL
+                        '172.21.0.1:0.0',      # Possível IP do WSL
+                        '172.22.0.1:0.0',      # Possível IP do WSL
+                        '172.23.0.1:0.0',      # Possível IP do WSL
+                        '172.24.0.1:0.0',      # Possível IP do WSL
+                        '172.25.0.1:0.0',      # Possível IP do WSL
+                        '172.26.0.1:0.0',      # Possível IP do WSL
+                        '172.27.0.1:0.0',      # Possível IP do WSL
+                        '172.28.0.1:0.0',      # Possível IP do WSL
+                        '172.29.0.1:0.0',      # Possível IP do WSL
+                        '172.30.0.1:0.0',      # Possível IP do WSL
+                        '172.31.0.1:0.0'       # Possível IP do WSL
+                    ]
+            
+            # Tenta cada opção até uma funcionar
+            for display in display_options:
+                try:
+                    print(f"Tentando DISPLAY={display}")
+                    os.environ['DISPLAY'] = display
+                    # Testa se o display funciona criando um widget temporário
+                    test_root = tk.Tk()
+                    test_root.withdraw()
+                    test_root.destroy()
+                    print(f"DISPLAY={display} funcionou!")
+                    break
+                except Exception as e:
+                    print(f"Falha com DISPLAY={display}: {e}")
+                    continue
+        
+        # Configuração adicional para o PIL/Tkinter
+        os.environ['PYTHONUNBUFFERED'] = '1'  # Garante saída imediata
+        
+        # Verifica se o servidor X está acessível
+        print("Verificando se o servidor X (VcXsrv) está acessível...")
+        try:
+            import subprocess
+            # Tenta executar um comando simples do X11 para verificar se o servidor está respondendo
+            subprocess.run(['xset', 'q'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            print("Servidor X está acessível!")
+        except Exception as e:
+            print(f"AVISO: Servidor X pode não estar acessível: {e}")
+            print("Continuando mesmo assim, mas pode falhar se o VcXsrv não estiver configurado corretamente.")
+        
         root = tk.Tk()
         app = PokerGUI(root)
         print("Interface gráfica inicializada")
@@ -1229,5 +1345,12 @@ if __name__ == "__main__":
         print("1. VcXsrv está instalado e rodando no Windows")
         print("2. XLaunch foi configurado com 'Disable access control'")
         print("3. Firewall do Windows permite conexões do WSL")
+        print("\nDica: Você pode definir manualmente o DISPLAY usando:")
+        print("   export DISPLAY=<IP-do-Windows>:0.0")
+        print("   Exemplo: export DISPLAY=192.168.1.100:0.0")
+        print("   Depois execute novamente: python poker_gui.py")
+        print("\nPara verificar sua configuração, execute o script de diagnóstico:")
+        print("   python check_display.py")
+        print("   Este script verificará sua configuração e sugerirá correções.")
         import traceback
         traceback.print_exc()
