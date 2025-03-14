@@ -1,4 +1,4 @@
-import tkinter as tk
+import tkinter as tkpp
 from PIL import Image, ImageDraw, ImageFont
 import os
 import tempfile
