@@ -500,20 +500,16 @@ class Player:
                     raise_amount = min(current_bet + min_raise, self.chips)
                     if raise_amount >= self.chips:
                         raise_amount = self.chips
-                        return "raise", raise_amount
-                    else:
-                        self.chips -= raise_amount
-                        return "raise", raise_amount
+                    return "raise", raise_amount
                 else:  # call
                     bet_amount = min(current_bet, self.chips)
                     if bet_amount >= self.chips:
                         bet_amount = self.chips
-                    self.chips -= bet_amount
-                    
+
                     # Save Q-table after significant actions
                     if self.is_machine:
                         self.save_q_table()
-                    
+
                     return "call", bet_amount
 
 class PokerGame:

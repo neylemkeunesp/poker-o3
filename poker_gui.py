@@ -9,28 +9,83 @@ from card_graphics import CardGraphics
 class PokerGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Texas Hold'em Poker")
-        self.root.geometry("1024x768")  # Larger window to ensure all elements are visible
-        self.root.configure(bg='#1a472a')  # Dark green poker theme
-        
+        self.root.title("🃏 Texas Hold'em Poker - Premium Edition")
+        self.root.geometry("1500x1000")  # Aumentado para acomodar cartas maiores
+        self.root.configure(bg='#0d1b2a')  # Dark blue-black background
+
         # Initialize card graphics
         self.card_graphics = CardGraphics()
         self.card_back = self.card_graphics.get_card_back()
-        
-        # Configure style
+
+        # Modern color palette
+        self.colors = {
+            'bg_dark': '#0d1b2a',
+            'bg_medium': '#1b263b',
+            'bg_light': '#415a77',
+            'accent_gold': '#ffd60a',
+            'accent_blue': '#4cc9f0',
+            'accent_green': '#06ffa5',
+            'accent_red': '#ff006e',
+            'text_white': '#ffffff',
+            'text_gray': '#a8b2c1',
+            'table_felt': '#0f5132',
+            'card_shadow': '#000814'
+        }
+
+        # Configure modern style
         style = ttk.Style()
-        style.configure('TFrame', background='#1a472a')
-        style.configure('TLabel', background='#1a472a', foreground='white', anchor='center')
-        style.configure('TButton', padding=5)
-        
-        # Custom button styles
-        style.configure('Action.TButton', font=('Arial', 12, 'bold'))
-        style.configure('Call.TButton', background='#4caf50')
-        style.configure('Raise.TButton', background='#2196f3')
-        style.configure('Fold.TButton', background='#f44336')
-        
-        # Main container
-        self.main_container = ttk.Frame(self.root)
+        style.theme_use('clam')
+        style.configure('TFrame', background=self.colors['bg_dark'])
+        style.configure('TLabel',
+                       background=self.colors['bg_dark'],
+                       foreground=self.colors['text_white'],
+                       font=('Segoe UI', 10))
+
+        # Custom button styles with modern look
+        style.configure('Action.TButton',
+                       font=('Segoe UI', 11, 'bold'),
+                       borderwidth=0,
+                       relief='flat',
+                       padding=10)
+
+        style.map('Action.TButton',
+                 background=[('active', self.colors['bg_light']), ('!active', self.colors['bg_medium'])],
+                 foreground=[('active', self.colors['text_white']), ('!active', self.colors['text_white'])])
+
+        style.configure('Call.TButton',
+                       background=self.colors['accent_green'],
+                       foreground='#000000')
+        style.configure('Raise.TButton',
+                       background=self.colors['accent_blue'],
+                       foreground='#000000')
+        style.configure('Fold.TButton',
+                       background=self.colors['accent_red'],
+                       foreground='#ffffff')
+
+        # Create canvas and scrollbar for scrolling capability
+        self.canvas = tk.Canvas(self.root, bg=self.colors['bg_dark'], highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas, style='TFrame')
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        # Pack scrollbar and canvas
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+        # Bind mouse wheel for scrolling
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel)  # Linux scroll up
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel)  # Linux scroll down
+
+        # Main container (inside scrollable frame)
+        self.main_container = ttk.Frame(self.scrollable_frame, style='TFrame')
         self.main_container.pack(expand=True, fill='both', padx=20, pady=10)
         
         # Set up frames and components
@@ -64,391 +119,556 @@ class PokerGUI:
 
     def setup_frames(self):
         """Set up all frames in the interface"""
-        # Top section: Game phase banner
+        # Top section: Game phase banner with gradient effect
         self.phase_banner_frame = tk.Frame(
             self.main_container,
-            bg='#0a1f12',
-            height=60
+            bg=self.colors['bg_medium'],
+            height=80,
+            relief=tk.FLAT,
+            bd=0
         )
-        self.phase_banner_frame.pack(fill='x', pady=(0, 10))
-        
-        # Phase indicator
+        self.phase_banner_frame.pack(fill='x', pady=(0, 15))
+
+        # Add decorative border
+        border_frame = tk.Frame(
+            self.phase_banner_frame,
+            bg=self.colors['accent_gold'],
+            height=3
+        )
+        border_frame.pack(fill='x', side='bottom')
+
+        # Phase indicator with modern styling
         self.phase_label = tk.Label(
             self.phase_banner_frame,
-            text="FASE: PRÉ-FLOP",
-            font=('Arial', 18, 'bold'),
-            fg='#FFD700',
-            bg='#0a1f12'
+            text="✦ FASE: PRÉ-FLOP ✦",
+            font=('Segoe UI', 18, 'bold'),
+            fg=self.colors['accent_gold'],
+            bg=self.colors['bg_medium']
         )
-        self.phase_label.pack(fill='both', expand=True, pady=10)
-        
-        # Winner announcement frame (initially hidden)
+        self.phase_label.pack(fill='both', expand=True, pady=8)
+
+        # Winner announcement frame (initially hidden) with celebratory styling
         self.winner_frame = tk.Frame(
             self.main_container,
-            bg='#0a1f12',
-            height=60
+            bg=self.colors['bg_medium'],
+            height=60,
+            relief=tk.RIDGE,
+            bd=3,
+            highlightbackground=self.colors['accent_gold'],
+            highlightthickness=3
         )
-        self.winner_frame.pack(fill='x', pady=(0, 10))
+        self.winner_frame.pack(fill='x', pady=(0, 8))
         self.winner_frame.pack_forget()  # Initially hidden
-        
+
         self.winner_label = tk.Label(
             self.winner_frame,
             text="",
-            font=('Arial', 22, 'bold'),
-            fg='#FFD700',
-            bg='#0a1f12'
+            font=('Segoe UI', 20, 'bold'),
+            fg=self.colors['accent_gold'],
+            bg=self.colors['bg_medium']
         )
-        self.winner_label.pack(fill='both', expand=True, pady=10)
-        
-        # Opponent section
-        self.opponent_section = tk.Frame(self.main_container, bg='#1a472a')
-        self.opponent_section.pack(fill='x', pady=10)
-        
-        # Opponent info and cards
-        self.opponent_info = tk.Frame(self.opponent_section, bg='#1a472a')
-        self.opponent_info.pack(side='left', padx=20)
-        
-        self.machine_name_label = tk.Label(
-            self.opponent_info, 
-            text="MÁQUINA", 
-            font=('Arial', 14, 'bold'),
-            fg='white', 
-            bg='#1a472a'
-        )
-        self.machine_name_label.pack(anchor='w', pady=(0, 5))
-        
-        self.machine_chips_box = tk.Frame(
-            self.opponent_info,
-            bg='#233729',
-            highlightbackground='#FF6347',  # Red for opponent
-            highlightthickness=2,
-            padx=10,
-            pady=5
-        )
-        self.machine_chips_box.pack(anchor='w')
-        
-        self.machine_chips_display = tk.Label(
-            self.machine_chips_box,
-            text="1000 💰",
-            font=('Arial', 14, 'bold'),
-            fg='#FFD700',
-            bg='#233729'
-        )
-        self.machine_chips_display.pack(anchor='w')
-        
-        # Opponent cards frame
-        self.opponent_cards_frame = tk.Frame(self.opponent_section, bg='#1a472a')
-        self.opponent_cards_frame.pack(side='right', padx=20)
-        
-        # Opponent card labels
-        self.opponent_card_labels = []
-        for i in range(2):
-            label = ttk.Label(self.opponent_cards_frame)
-            label.pack(side='left', padx=5)
-            self.opponent_card_labels.append(label)
-        
-        # Community cards section
-        self.community_section = tk.Frame(self.main_container, bg='#1a472a')
-        self.community_section.pack(fill='x', pady=20)
-        
-        # Pot display
-        self.pot_frame = tk.Frame(self.community_section, bg='#1a472a')
-        self.pot_frame.pack(side='top', pady=10)
-        
-        self.pot_label = tk.Label(
-            self.pot_frame,
-            text="POTE ATUAL",
-            font=('Arial', 14, 'bold'),
-            fg='white',
-            bg='#1a472a'
-        )
-        self.pot_label.pack()
-        
-        self.pot_box = tk.Frame(
-            self.pot_frame,
-            bg='#233729',
-            highlightbackground='#FF9900',
-            highlightthickness=3,
+        self.winner_label.pack(fill='both', expand=True, pady=8)
+
+        # Opponent section with modern card layout
+        self.opponent_section = tk.Frame(
+            self.main_container,
+            bg=self.colors['bg_medium'],
+            relief=tk.FLAT,
+            bd=5,
             padx=15,
             pady=10
         )
-        self.pot_box.pack()
+        self.opponent_section.pack(fill='x', pady=8)
+
+        # Opponent info and cards
+        self.opponent_info = tk.Frame(self.opponent_section, bg=self.colors['bg_medium'])
+        self.opponent_info.pack(side='left', padx=20)
+
+        self.machine_name_label = tk.Label(
+            self.opponent_info,
+            text="🤖 MÁQUINA AI",
+            font=('Segoe UI', 16, 'bold'),
+            fg=self.colors['accent_red'],
+            bg=self.colors['bg_medium']
+        )
+        self.machine_name_label.pack(anchor='w', pady=(0, 8))
+
+        # Modern chip display for opponent
+        self.machine_chips_box = tk.Frame(
+            self.opponent_info,
+            bg=self.colors['bg_light'],
+            relief=tk.FLAT,
+            bd=0,
+            padx=15,
+            pady=8
+        )
+        self.machine_chips_box.pack(anchor='w')
+
+        # Add subtle border effect
+        tk.Frame(
+            self.machine_chips_box,
+            bg=self.colors['accent_red'],
+            height=2
+        ).pack(side='top', fill='x')
+
+        self.machine_chips_display = tk.Label(
+            self.machine_chips_box,
+            text="💎 1000",
+            font=('Segoe UI', 15, 'bold'),
+            fg=self.colors['accent_gold'],
+            bg=self.colors['bg_light']
+        )
+        self.machine_chips_display.pack(anchor='w', pady=(3,0))
         
+        # Opponent cards container with title
+        self.opponent_cards_container = tk.Frame(self.opponent_section, bg=self.colors['bg_medium'])
+        self.opponent_cards_container.pack(side='right', padx=20)
+
+        # Label above opponent cards
+        self.opponent_cards_title = tk.Label(
+            self.opponent_cards_container,
+            text="🤖 CARTAS DA MÁQUINA",
+            font=('Segoe UI', 13, 'bold'),
+            fg=self.colors['accent_red'],
+            bg=self.colors['bg_medium']
+        )
+        self.opponent_cards_title.pack(pady=(0, 8))
+
+        # Opponent cards frame
+        self.opponent_cards_frame = tk.Frame(self.opponent_cards_container, bg=self.colors['bg_medium'])
+        self.opponent_cards_frame.pack()
+
+        # Opponent card labels
+        self.opponent_card_labels = []
+        for i in range(2):
+            label = ttk.Label(self.opponent_cards_frame, background=self.colors['bg_medium'])
+            label.pack(side='left', padx=10)  # Aumentado de 5 para 10 para acomodar cartas maiores
+            self.opponent_card_labels.append(label)
+
+        # Community cards section with premium styling
+        self.community_section = tk.Frame(
+            self.main_container,
+            bg=self.colors['bg_dark']
+        )
+        self.community_section.pack(fill='x', pady=10)
+        
+        # Info bar with pot and bet
+        info_bar = tk.Frame(self.community_section, bg=self.colors['bg_medium'], pady=10)
+        info_bar.pack(side='top', pady=10)
+
+        # Pot display - Premium styling
+        self.pot_frame = tk.Frame(info_bar, bg=self.colors['bg_medium'])
+        self.pot_frame.pack(side='left', padx=20)
+
+        self.pot_label = tk.Label(
+            self.pot_frame,
+            text="💰 POTE TOTAL",
+            font=('Segoe UI', 12, 'bold'),
+            fg=self.colors['text_gray'],
+            bg=self.colors['bg_medium']
+        )
+        self.pot_label.pack()
+
+        self.pot_box = tk.Frame(
+            self.pot_frame,
+            bg=self.colors['bg_light'],
+            relief=tk.FLAT,
+            bd=0,
+            padx=20,
+            pady=12
+        )
+        self.pot_box.pack(pady=(5,0))
+
+        # Decorative top border for pot
+        tk.Frame(
+            self.pot_box,
+            bg=self.colors['accent_gold'],
+            height=3
+        ).pack(side='top', fill='x')
+
         self.pot_display = tk.Label(
             self.pot_box,
-            text="0 💰",
-            font=('Arial', 18, 'bold'),
-            fg='#FF9900',
-            bg='#233729'
+            text="0",
+            font=('Segoe UI', 22, 'bold'),
+            fg=self.colors['accent_gold'],
+            bg=self.colors['bg_light']
         )
-        self.pot_display.pack()
-        
-        # Current bet display
-        self.current_bet_frame = tk.Frame(self.community_section, bg='#1a472a')
-        self.current_bet_frame.pack(side='top', pady=5)
-        
+        self.pot_display.pack(pady=(5,0))
+
+        # Current bet display - Modern styling
+        self.current_bet_frame = tk.Frame(info_bar, bg=self.colors['bg_medium'])
+        self.current_bet_frame.pack(side='left', padx=20)
+
         self.current_bet_label = tk.Label(
             self.current_bet_frame,
-            text="APOSTA ATUAL",
-            font=('Arial', 12),
-            fg='white',
-            bg='#1a472a'
+            text="🎯 APOSTA ATUAL",
+            font=('Segoe UI', 12, 'bold'),
+            fg=self.colors['text_gray'],
+            bg=self.colors['bg_medium']
         )
         self.current_bet_label.pack()
-        
+
         self.current_bet_box = tk.Frame(
             self.current_bet_frame,
-            bg='#233729',
-            highlightbackground='#90EE90',
-            highlightthickness=2,
-            padx=10,
-            pady=5
+            bg=self.colors['bg_light'],
+            relief=tk.FLAT,
+            bd=0,
+            padx=20,
+            pady=12
         )
-        self.current_bet_box.pack()
-        
+        self.current_bet_box.pack(pady=(5,0))
+
+        # Decorative top border for bet
+        tk.Frame(
+            self.current_bet_box,
+            bg=self.colors['accent_blue'],
+            height=3
+        ).pack(side='top', fill='x')
+
         self.current_bet_display = tk.Label(
             self.current_bet_box,
-            text="50 💰",
-            font=('Arial', 14, 'bold'),
-            fg='#90EE90',
-            bg='#233729'
+            text="50",
+            font=('Segoe UI', 22, 'bold'),
+            fg=self.colors['accent_blue'],
+            bg=self.colors['bg_light']
         )
-        self.current_bet_display.pack()
-        
-        # Community cards frame
+        self.current_bet_display.pack(pady=(5,0))
+
+        # Total chips display - Conservation verification
+        self.total_chips_frame = tk.Frame(info_bar, bg=self.colors['bg_medium'])
+        self.total_chips_frame.pack(side='left', padx=20)
+
+        self.total_chips_label = tk.Label(
+            self.total_chips_frame,
+            text="🔢 TOTAL EM JOGO",
+            font=('Segoe UI', 12, 'bold'),
+            fg=self.colors['text_gray'],
+            bg=self.colors['bg_medium']
+        )
+        self.total_chips_label.pack()
+
+        self.total_chips_box = tk.Frame(
+            self.total_chips_frame,
+            bg=self.colors['bg_light'],
+            relief=tk.FLAT,
+            bd=0,
+            padx=20,
+            pady=12
+        )
+        self.total_chips_box.pack(pady=(5,0))
+
+        # Decorative top border for total
+        self.total_chips_border = tk.Frame(
+            self.total_chips_box,
+            bg=self.colors['accent_green'],
+            height=3
+        )
+        self.total_chips_border.pack(side='top', fill='x')
+
+        self.total_chips_display = tk.Label(
+            self.total_chips_box,
+            text="2000",
+            font=('Segoe UI', 22, 'bold'),
+            fg=self.colors['accent_green'],
+            bg=self.colors['bg_light']
+        )
+        self.total_chips_display.pack(pady=(5,0))
+
+        # Community cards frame with premium felt table
         self.community_cards_label = tk.Label(
             self.community_section,
-            text="CARTAS COMUNITÁRIAS",
-            font=('Arial', 14, 'bold'),
-            fg='white', 
-            bg='#1a472a'
+            text="♠ CARTAS COMUNITÁRIAS ♥",
+            font=('Segoe UI', 14, 'bold'),
+            fg=self.colors['text_white'],
+            bg=self.colors['bg_dark']
         )
         self.community_cards_label.pack(pady=(20, 10))
-        
-        self.community_cards_frame = tk.Frame(self.community_section, bg='#1a472a')
+
+        self.community_cards_frame = tk.Frame(self.community_section, bg=self.colors['bg_dark'])
         self.community_cards_frame.pack(pady=10)
-        
-        # Table background for community cards - green felt
-        self.table_bg = tk.Frame(
+
+        # Premium poker table background with elevated design
+        table_outer = tk.Frame(
             self.community_cards_frame,
-            bg='#0a3b0a',
-            width=550,
-            height=160,
-            padx=10,
-            pady=10,
-            relief=tk.RIDGE,
-            borderwidth=3
+            bg=self.colors['bg_light'],
+            relief=tk.RAISED,
+            bd=3
+        )
+        table_outer.pack(padx=5, pady=5)
+
+        self.table_bg = tk.Frame(
+            table_outer,
+            bg=self.colors['table_felt'],
+            width=850,  # Aumentado de 600 para 850 para acomodar cartas maiores
+            height=240,  # Aumentado de 180 para 240 para altura das cartas
+            padx=15,
+            pady=15
         )
         self.table_bg.pack()
-        self.table_bg.pack_propagate(False)  # Maintain the size
-        
+        self.table_bg.pack_propagate(False)
+
+        # Decorative corners
+        for pos in ['nw', 'ne', 'sw', 'se']:
+            corner = tk.Frame(
+                self.table_bg,
+                bg=self.colors['accent_gold'],
+                width=3,
+                height=3
+            )
+            if 'n' in pos:
+                corner.place(relx=0 if 'w' in pos else 1, rely=0, anchor=pos)
+            else:
+                corner.place(relx=0 if 'w' in pos else 1, rely=1, anchor=pos)
+
         # Community card labels
-        self.community_card_container = tk.Frame(self.table_bg, bg='#0a3b0a')
+        self.community_card_container = tk.Frame(self.table_bg, bg=self.colors['table_felt'])
         self.community_card_container.pack(expand=True, fill='both')
-        
+
         self.community_card_labels = []
         for i in range(5):
-            label = ttk.Label(self.community_card_container, background='#0a3b0a')
-            label.pack(side='left', padx=5)
+            label = ttk.Label(self.community_card_container, background=self.colors['table_felt'])
+            label.pack(side='left', padx=10)  # Aumentado de 6 para 10 para melhor espaçamento
             self.community_card_labels.append(label)
         
-        # Player section
-        self.player_section = tk.Frame(self.main_container, bg='#1a472a')
-        self.player_section.pack(fill='x', pady=(20, 10))
-        
-        # Player cards
-        self.player_cards_frame = tk.Frame(self.player_section, bg='#1a472a')
-        self.player_cards_frame.pack(side='right', padx=20)
-        
-        self.player_card_labels = []
-        for i in range(2):
-            label = ttk.Label(self.player_cards_frame)
-            label.pack(side='left', padx=5)
-            self.player_card_labels.append(label)
-        
-        # Player info
-        self.player_info = tk.Frame(self.player_section, bg='#1a472a')
-        self.player_info.pack(side='left', padx=20)
-        
-        self.player_name_label = tk.Label(
-            self.player_info, 
-            text="JOGADOR 1", 
-            font=('Arial', 14, 'bold'),
-            fg='white', 
-            bg='#1a472a'
+        # Player section with modern styling
+        self.player_section = tk.Frame(
+            self.main_container,
+            bg=self.colors['bg_medium'],
+            relief=tk.FLAT,
+            bd=5,
+            padx=15,
+            pady=15
         )
-        self.player_name_label.pack(anchor='w', pady=(0, 5))
-        
+        self.player_section.pack(fill='x', pady=(20, 10))
+
+        # Container for player info (left side)
+        self.player_info = tk.Frame(self.player_section, bg=self.colors['bg_medium'])
+        self.player_info.pack(side='left', padx=20)
+
+        self.player_name_label = tk.Label(
+            self.player_info,
+            text="👤 VOCÊ",
+            font=('Segoe UI', 16, 'bold'),
+            fg=self.colors['accent_green'],
+            bg=self.colors['bg_medium']
+        )
+        self.player_name_label.pack(anchor='w', pady=(0, 8))
+
+        # Premium chip display for player
         self.player_chips_box = tk.Frame(
             self.player_info,
-            bg='#233729',
-            highlightbackground='#FFD700',  # Gold for player
-            highlightthickness=2,
-            padx=10,
-            pady=5
+            bg=self.colors['bg_light'],
+            relief=tk.FLAT,
+            bd=0,
+            padx=15,
+            pady=8
         )
         self.player_chips_box.pack(anchor='w')
-        
+
+        # Add subtle border effect
+        tk.Frame(
+            self.player_chips_box,
+            bg=self.colors['accent_green'],
+            height=2
+        ).pack(side='top', fill='x')
+
         self.player_chips_display = tk.Label(
             self.player_chips_box,
-            text="1000 💰",
-            font=('Arial', 14, 'bold'),
-            fg='#FFD700',
-            bg='#233729'
+            text="💎 1000",
+            font=('Segoe UI', 15, 'bold'),
+            fg=self.colors['accent_gold'],
+            bg=self.colors['bg_light']
         )
-        self.player_chips_display.pack(anchor='w')
+        self.player_chips_display.pack(anchor='w', pady=(3,0))
+
+        # Container for player cards (right side) - text above cards
+        self.player_cards_container = tk.Frame(self.player_section, bg=self.colors['bg_medium'])
+        self.player_cards_container.pack(side='right', padx=20)
+
+        # Label above cards - mais visível
+        self.player_cards_title = tk.Label(
+            self.player_cards_container,
+            text="👤 SUAS CARTAS",
+            font=('Segoe UI', 13, 'bold'),
+            fg=self.colors['accent_green'],  # Verde destaque igual ao nome
+            bg=self.colors['bg_medium']
+        )
+        self.player_cards_title.pack(pady=(0, 8))
+
+        # Cards frame
+        self.player_cards_frame = tk.Frame(self.player_cards_container, bg=self.colors['bg_medium'])
+        self.player_cards_frame.pack()
+
+        self.player_card_labels = []
+        for i in range(2):
+            label = ttk.Label(self.player_cards_frame, background=self.colors['bg_medium'])
+            label.pack(side='left', padx=10)  # Aumentado de 5 para 10 para acomodar cartas maiores
+            self.player_card_labels.append(label)
         
-        # Player action buttons
-        self.action_buttons_frame = tk.Frame(self.main_container, bg='#1a472a')
-        self.action_buttons_frame.pack(fill='x', pady=10)
-        
-        # Player's hand strength indicator
-        self.hand_strength_frame = tk.Frame(self.action_buttons_frame, bg='#1a472a')
+        # Player action buttons with modern design
+        self.action_buttons_frame = tk.Frame(
+            self.main_container,
+            bg=self.colors['bg_dark'],
+            pady=15
+        )
+        self.action_buttons_frame.pack(fill='x', pady=8)
+
+        # Player's hand strength indicator - Premium card
+        self.hand_strength_frame = tk.Frame(
+            self.action_buttons_frame,
+            bg=self.colors['bg_medium'],
+            padx=20,
+            pady=12,
+            relief=tk.FLAT
+        )
         self.hand_strength_frame.pack(side='left', padx=20)
-        
+
+        tk.Frame(
+            self.hand_strength_frame,
+            bg=self.colors['accent_green'],
+            height=2
+        ).pack(side='top', fill='x')
+
         self.hand_strength_label = tk.Label(
             self.hand_strength_frame,
-            text="SUA MÃO:",
-            font=('Arial', 12),
-            fg='white',
-            bg='#1a472a'
+            text="🎴 SUA MÃO:",
+            font=('Segoe UI', 11, 'bold'),
+            fg=self.colors['text_gray'],
+            bg=self.colors['bg_medium']
         )
-        self.hand_strength_label.pack(anchor='w')
-        
+        self.hand_strength_label.pack(anchor='w', pady=(5,2))
+
         self.hand_type_display = tk.Label(
             self.hand_strength_frame,
             text="-",
-            font=('Arial', 14, 'bold'),
-            fg='#90EE90',
-            bg='#1a472a'
+            font=('Segoe UI', 16, 'bold'),
+            fg=self.colors['accent_green'],
+            bg=self.colors['bg_medium']
         )
         self.hand_type_display.pack(anchor='w')
-        
-        # Control buttons - improved styling
-        self.button_container = tk.Frame(self.action_buttons_frame, bg='#1a472a')
+
+        # Control buttons - Premium modern design
+        self.button_container = tk.Frame(self.action_buttons_frame, bg=self.colors['bg_dark'])
         self.button_container.pack(side='right', padx=20)
-        
-        self.call_button = ttk.Button(
-            self.button_container,
-            text="CALL",
+
+        # Call button with green theme
+        call_btn_frame = tk.Frame(self.button_container, bg=self.colors['accent_green'], relief=tk.FLAT, bd=0)
+        call_btn_frame.pack(side='left', padx=5)
+
+        self.call_button = tk.Button(
+            call_btn_frame,
+            text="✓ PAGAR",
             command=self.call_action,
-            style='Action.TButton',
-            width=16
+            font=('Segoe UI', 12, 'bold'),
+            bg=self.colors['accent_green'],
+            fg='#000000',
+            activebackground='#05dd8e',
+            activeforeground='#000000',
+            relief=tk.FLAT,
+            bd=0,
+            padx=25,
+            pady=12,
+            cursor='hand2'
         )
-        self.call_button.pack(side='left', padx=8)
-        
-        self.raise_button = ttk.Button(
-            self.button_container,
-            text="RAISE",
+        self.call_button.pack()
+
+        # Raise button with blue theme
+        raise_btn_frame = tk.Frame(self.button_container, bg=self.colors['accent_blue'], relief=tk.FLAT, bd=0)
+        raise_btn_frame.pack(side='left', padx=5)
+
+        self.raise_button = tk.Button(
+            raise_btn_frame,
+            text="↑ AUMENTAR",
             command=self.raise_action,
-            style='Action.TButton',
-            width=16
+            font=('Segoe UI', 12, 'bold'),
+            bg=self.colors['accent_blue'],
+            fg='#000000',
+            activebackground='#3bb0d9',
+            activeforeground='#000000',
+            relief=tk.FLAT,
+            bd=0,
+            padx=25,
+            pady=12,
+            cursor='hand2'
         )
-        self.raise_button.pack(side='left', padx=8)
-        
-        self.fold_button = ttk.Button(
-            self.button_container,
-            text="FOLD",
+        self.raise_button.pack()
+
+        # Fold button with red theme
+        fold_btn_frame = tk.Frame(self.button_container, bg=self.colors['accent_red'], relief=tk.FLAT, bd=0)
+        fold_btn_frame.pack(side='left', padx=5)
+
+        self.fold_button = tk.Button(
+            fold_btn_frame,
+            text="✕ DESISTIR",
             command=self.fold_action,
-            style='Action.TButton',
-            width=16
+            font=('Segoe UI', 12, 'bold'),
+            bg=self.colors['accent_red'],
+            fg='#ffffff',
+            activebackground='#e0005d',
+            activeforeground='#ffffff',
+            relief=tk.FLAT,
+            bd=0,
+            padx=25,
+            pady=12,
+            cursor='hand2'
         )
-        self.fold_button.pack(side='left', padx=8)
+        self.fold_button.pack()
         
-        # Hand progress indicators
-        self.progress_frame = tk.Frame(self.main_container, bg='#1a472a')
-        self.progress_frame.pack(fill='x', pady=10)
-        
+        # Hand progress indicators with modern timeline
+        self.progress_frame = tk.Frame(
+            self.main_container,
+            bg=self.colors['bg_medium'],
+            pady=15
+        )
+        self.progress_frame.pack(fill='x', pady=8)
+
         self.hand_progress_label = tk.Label(
             self.progress_frame,
-            text="PROGRESSO DA MÃO:",
-            font=('Arial', 12),
-            fg='white',
-            bg='#1a472a'
+            text="📊 PROGRESSO DA MÃO",
+            font=('Segoe UI', 12, 'bold'),
+            fg=self.colors['text_white'],
+            bg=self.colors['bg_medium']
         )
-        self.hand_progress_label.pack(anchor='w', padx=20)
-        
-        self.hand_progress_container = tk.Frame(self.progress_frame, bg='#1a472a')
-        self.hand_progress_container.pack(fill='x', padx=20, pady=5)
-        
+        self.hand_progress_label.pack(anchor='w', padx=20, pady=(0,10))
+
+        self.hand_progress_container = tk.Frame(self.progress_frame, bg=self.colors['bg_medium'])
+        self.hand_progress_container.pack(fill='x', padx=40, pady=10)
+
         self.hand_stages = ["Pré-Flop", "Flop", "Turn", "River", "Showdown"]
         self.hand_stage_indicators = []
-        
-        # Create progress indicators for each stage
+
+        # Create modern progress indicators for each stage
         for i, stage in enumerate(self.hand_stages):
-            stage_frame = tk.Frame(self.hand_progress_container, bg='#1a472a')
+            stage_frame = tk.Frame(self.hand_progress_container, bg=self.colors['bg_medium'])
             stage_frame.pack(side='left', expand=True, fill='x')
-            
+
             # Visual connection line
             if i > 0:
-                line_frame = tk.Frame(stage_frame, bg='#444444', height=2)
-                line_frame.pack(fill='x', pady=10)
-            
-            # Stage indicator
+                line_frame = tk.Frame(stage_frame, bg=self.colors['bg_light'], height=3)
+                line_frame.pack(fill='x', pady=12)
+
+            # Stage indicator circle
             indicator = tk.Label(
                 stage_frame,
-                text="○",
-                font=('Arial', 18),
-                fg='#888888',
-                bg='#1a472a'
+                text="●",
+                font=('Segoe UI', 20),
+                fg=self.colors['bg_light'],
+                bg=self.colors['bg_medium']
             )
             indicator.pack(anchor='center')
-            
+
             # Stage name
             name_label = tk.Label(
                 stage_frame,
                 text=stage,
-                font=('Arial', 10),
-                fg='#888888',
-                bg='#1a472a'
+                font=('Segoe UI', 9, 'bold'),
+                fg=self.colors['text_gray'],
+                bg=self.colors['bg_medium']
             )
-            name_label.pack(anchor='center')
-            
+            name_label.pack(anchor='center', pady=(2,0))
+
             self.hand_stage_indicators.append((indicator, name_label))
-        
-        # Game action history
-        self.history_frame = tk.Frame(self.main_container, bg='#0a1f12')
-        self.history_frame.pack(fill='both', expand=True, pady=10)
-        
-        self.history_label = tk.Label(
-            self.history_frame,
-            text="HISTÓRICO DE AÇÕES",
-            font=('Arial', 12, 'bold'),
-            fg='white',
-            bg='#0a1f12'
-        )
-        self.history_label.pack(pady=5)
-        
-        # Scrollable history view
-        self.history_canvas = tk.Canvas(
-            self.history_frame,
-            bg='#0a1f12',
-            highlightthickness=0
-        )
-        self.history_scrollbar = ttk.Scrollbar(
-            self.history_frame,
-            orient="vertical",
-            command=self.history_canvas.yview
-        )
-        
-        self.history_scrollable_frame = ttk.Frame(self.history_canvas)
-        
-        self.history_scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.history_canvas.configure(scrollregion=self.history_canvas.bbox("all"))
-        )
-        
-        self.history_canvas.create_window(
-            (0, 0),
-            window=self.history_scrollable_frame,
-            anchor="nw",
-            width=self.history_canvas.winfo_width()
-        )
-        self.history_canvas.configure(yscrollcommand=self.history_scrollbar.set)
-        
-        self.history_scrollbar.pack(side="right", fill="y")
-        self.history_canvas.pack(side="left", fill="both", expand=True)
-        
+
         # Bottom navigation buttons
         self.nav_buttons_frame = tk.Frame(self.main_container, bg='#1a472a')
         self.nav_buttons_frame.pack(fill='x', pady=10)
@@ -493,100 +713,66 @@ class PokerGUI:
         self.new_hand_button.config(state='disabled')
 
     def log_message(self, message):
-        """Add a message to the game log with formatting"""
+        """Add a message to the game log"""
         # Store message in history
         self.message_history.append(message)
-        
-        # Determine icon and colors based on message content
-        icon = "🔄"  # Default icon
-        bg_color = "#0a1f12"  # Default background
-        fg_color = "#e0e0e0"  # Default text color
-        
-        # Apply specific styling based on message content
-        if message.startswith('==='):
-            icon = "📌"
-            bg_color = "#1a3a2a"
-        elif '🏆' in message:
-            icon = "🏆"
-            bg_color = "#2a3a1a"
-            fg_color = "#90EE90"  # Light green
-        elif 'chips' in message.lower() or '💰' in message:
-            icon = "💰"
-            bg_color = "#3a2a1a"
-            fg_color = "#FFD700"  # Gold
-        elif 'Jogador: Call' in message or 'Máquina: Call' in message:
-            icon = "✅"
-        elif 'Jogador: Raise' in message or 'Máquina: Raise' in message:
-            icon = "⬆️"
-        elif 'Fold' in message:
-            icon = "❌"
-        elif 'Flop' in message:
-            icon = "🃏"
-        elif 'Turn' in message:
-            icon = "🃏"
-        elif 'River' in message:
-            icon = "🃏"
-            
-        # Create message frame
-        message_frame = tk.Frame(
-            self.history_scrollable_frame,
-            background=bg_color,
-            padx=5,
-            pady=3
-        )
-        message_frame.pack(fill='x', pady=2, padx=5)
-        
-        # Add icon
-        icon_label = tk.Label(
-            message_frame,
-            text=icon,
-            font=('Arial', 12),
-            foreground=fg_color,
-            background=bg_color
-        )
-        icon_label.pack(side='left', padx=5)
-        
-        # Add message text
-        text_label = tk.Label(
-            message_frame,
-            text=message,
-            wraplength=800,
-            foreground=fg_color,
-            background=bg_color,
-            justify='left',
-            anchor='w'
-        )
-        text_label.pack(side='left', padx=5, fill='x', expand=True)
-        
-        # Scroll to bottom
-        self.history_canvas.update_idletasks()
-        self.history_canvas.yview_moveto(1.0)
-        self.root.update()
-        
+
+        # Print to console for debugging
+        print(message)
+
         # Update hand stats if needed
         self.update_game_info(message)
         
     def log_chip_state(self, action):
         """Log the current state of all chips"""
         total = self.player.chips + self.machine.chips + self.game.pot
+        expected_total = self.starting_chips * 2  # Should always be 2000 for 2 players
+
         message = f"\n[{action}]\n"
         message += f"Jogador: {self.player.chips} chips\n"
         message += f"Máquina: {self.machine.chips} chips\n"
         message += f"Pote: {self.game.pot} chips\n"
         message += f"Total: {total} chips"
-        if total != 2000:
-            message += f" ⚠️ ERRO: Total deveria ser 2000!"
+
+        if total != expected_total:
+            difference = total - expected_total
+            message += f"\n⚠️⚠️⚠️ ERRO DE CONSERVAÇÃO DE FICHAS! ⚠️⚠️⚠️"
+            message += f"\nEsperado: {expected_total} chips"
+            message += f"\nEncontrado: {total} chips"
+            message += f"\nDiferença: {difference:+d} chips"
+
         self.log_message(message)
-        
+
         # Update chip displays
         self.update_chip_displays()
         
     def update_chip_displays(self):
-        """Update all chip displays in the UI"""
-        self.player_chips_display.config(text=f"{self.player.chips} 💰")
-        self.machine_chips_display.config(text=f"{self.machine.chips} 💰")
-        self.pot_display.config(text=f"{self.game.pot} 💰")
-        self.current_bet_display.config(text=f"{self.current_bet} 💰")
+        """Update all chip displays in the UI with modern styling"""
+        self.player_chips_display.config(text=f"💎 {self.player.chips}")
+        self.machine_chips_display.config(text=f"💎 {self.machine.chips}")
+
+        # Calculate total chips in play
+        if self.game is not None:
+            total = self.player.chips + self.machine.chips + self.game.pot
+            self.pot_display.config(text=f"{self.game.pot}")
+            self.current_bet_display.config(text=f"{self.current_bet}")
+        else:
+            total = self.player.chips + self.machine.chips
+            self.pot_display.config(text="0")
+            self.current_bet_display.config(text="0")
+
+        # Update total display and change color if there's an error
+        expected_total = self.starting_chips * 2
+        self.total_chips_display.config(text=f"{total}")
+
+        if total != expected_total:
+            # Red for error
+            self.total_chips_display.config(fg=self.colors['accent_red'])
+            self.total_chips_border.config(bg=self.colors['accent_red'])
+        else:
+            # Green for correct
+            self.total_chips_display.config(fg=self.colors['accent_green'])
+            self.total_chips_border.config(bg=self.colors['accent_green'])
         
     def update_game_info(self, message):
         """Update game state indicators based on log messages"""
@@ -609,35 +795,42 @@ class PokerGUI:
             self.hand_type_display.config(text="-")
             
     def update_progress_indicators(self, stage_index):
-        """Update the hand progress indicators"""
+        """Update the hand progress indicators with modern styling"""
         # Update stage indicators
         for i, (indicator, label) in enumerate(self.hand_stage_indicators):
-            if i <= stage_index:
-                # Current/completed stage
-                indicator.config(text="●", fg="#FFD700")  # Gold
-                label.config(fg="#FFD700")
+            if i < stage_index:
+                # Completed stage
+                indicator.config(text="✓", fg=self.colors['accent_green'])
+                label.config(fg=self.colors['accent_green'])
+            elif i == stage_index:
+                # Current stage
+                indicator.config(text="●", fg=self.colors['accent_gold'])
+                label.config(fg=self.colors['accent_gold'])
             else:
                 # Future stage
-                indicator.config(text="○", fg="#888888")
-                label.config(fg="#888888")
-                
-        # Update phase banner
+                indicator.config(text="○", fg=self.colors['bg_light'])
+                label.config(fg=self.colors['text_gray'])
+
+        # Update phase banner with modern styling
         phases = ["PRÉ-FLOP", "FLOP", "TURN", "RIVER", "SHOWDOWN"]
+        phase_icons = ["🎴", "🃏", "🎯", "🎲", "🏆"]
+
         if 0 <= stage_index < len(phases):
-            self.phase_label.config(text=f"FASE: {phases[stage_index]}")
-            
-            # Different colors for each phase
-            colors = {
-                0: ("#FFD700", "#0a1f12"),  # Gold on dark green (Pre-flop)
-                1: ("#90EE90", "#0a1f12"),  # Light green on dark green (Flop)
-                2: ("#87CEEB", "#0a1f12"),  # Light blue on dark green (Turn)
-                3: ("#FFA07A", "#0a1f12"),  # Light salmon on dark green (River)
-                4: ("#FF6347", "#0a1f12"),  # Tomato on dark green (Showdown)
+            self.phase_label.config(
+                text=f"{phase_icons[stage_index]} FASE: {phases[stage_index]} {phase_icons[stage_index]}"
+            )
+
+            # Modern color scheme for each phase
+            phase_colors = {
+                0: self.colors['accent_gold'],    # Pre-flop
+                1: self.colors['accent_green'],   # Flop
+                2: self.colors['accent_blue'],    # Turn
+                3: self.colors['accent_red'],     # River
+                4: self.colors['accent_gold'],    # Showdown
             }
-            
-            fg_color, bg_color = colors.get(stage_index, ("#FFFFFF", "#0a1f12"))
-            self.phase_label.config(fg=fg_color, bg=bg_color)
-            self.phase_banner_frame.config(bg=bg_color)
+
+            fg_color = phase_colors.get(stage_index, self.colors['accent_gold'])
+            self.phase_label.config(fg=fg_color)
 
     def update_display(self):
         """Update all card displays"""
@@ -652,10 +845,9 @@ class PokerGUI:
                 label.configure(image='')
                 label._image = None
         
-        # Update opponent cards
+        # Update opponent cards (legacy, hidden frame)
         for i, label in enumerate(self.opponent_card_labels):
             if i < len(self.machine.hand):
-                # Only show machine's cards at showdown if no one folded
                 if (self.game and len(self.game.community_cards) == 5 and 
                     self.betting_round_complete and not any(p.folded for p in self.game.players)):
                     card = self.machine.hand[i]
@@ -668,7 +860,7 @@ class PokerGUI:
                 label.configure(image='')
                 label._image = None
         
-        # Update player cards
+        # Update player cards (legacy, hidden frame)
         for i, label in enumerate(self.player_card_labels):
             if i < len(self.player.hand):
                 card = self.player.hand[i]
@@ -678,7 +870,7 @@ class PokerGUI:
             else:
                 label.configure(image='')
                 label._image = None
-                
+
         # Update chip displays
         self.update_chip_displays()
 
@@ -719,10 +911,7 @@ class PokerGUI:
         
         # Clear log and history
         self.message_history.clear()
-        
-        for widget in self.history_scrollable_frame.winfo_children():
-            widget.destroy()
-            
+
         # Reset hand stats and progress
         self.hand_type_display.config(text="-")
         self.update_progress_indicators(0)  # Reset progress
@@ -731,12 +920,15 @@ class PokerGUI:
         if hasattr(self, 'winner_frame') and self.winner_frame is not None:
             self.winner_frame.pack_forget()
         
+        # Update chip displays immediately
+        self.update_chip_displays()
+
         # Log session start
         self.log_message("=== Nova Sessão de Poker ===")
         self.log_message(f"Objetivo: Alcançar {self.target_chips} chips")
         self.log_message(f"Jogador 1: {self.player.chips} chips")
         self.log_message(f"Máquina: {self.machine.chips} chips\n")
-        
+
         # Start first hand
         self.new_hand()
 
@@ -790,7 +982,10 @@ class PokerGUI:
         self.log_message(f"Jogador 1 posta small blind: {small_blind}")
         self.log_message(f"Máquina posta big blind: {big_blind}")
         self.log_chip_state("Blinds postados")
-        
+
+        # Update chip displays after blinds
+        self.update_chip_displays()
+
         # Update statistics
         self.player.game_sequence['hands_played'] += 1
         self.machine.game_sequence['hands_played'] += 1
@@ -838,6 +1033,7 @@ class PokerGUI:
             self.log_chip_state("Jogador Check")
         
         # Update UI before machine action
+        self.update_chip_displays()
         self.update_display()
         
         # Machine's turn
@@ -869,8 +1065,9 @@ class PokerGUI:
             
             self.log_message(f"Jogador: Raise para {total_amount} (Total na rodada: {self.player_bet_in_round})")
             self.log_chip_state("Jogador Raise")
-            
+
             # Update UI before machine action
+            self.update_chip_displays()
             self.update_display()
             
             # Machine's turn
@@ -923,80 +1120,75 @@ class PokerGUI:
 
     def machine_action(self):
         """Handle machine's betting action"""
-        # Store initial state
-        initial_machine_chips = self.machine.chips
-        initial_pot = self.game.pot
-        
         # Log state before action
         self.log_message(f"\nAntes da ação da Máquina:")
         self.log_chip_state("Estado Inicial")
-        
+
         # Get machine's decision
         action, amount = self.machine.make_decision(self.game.community_cards, self.current_bet, self.game.min_raise)
-        
+
         if action == "fold":
             # Machine folds
             self.machine.folded = True
             self.log_message("Máquina: Fold")
+            self.update_chip_displays()
             return
         elif action == "raise":
-            # Machine raises
-            if amount <= initial_machine_chips:
-                # Calculate call and raise amounts
-                call_amount = self.player_bet_in_round - self.machine_bet_in_round
-                raise_amount = self.game.min_raise
-                total_amount = call_amount + raise_amount
-                
-                if total_amount <= initial_machine_chips:
-                    # Standard raise
-                    self.machine.chips = initial_machine_chips - total_amount
-                    self.game.pot = initial_pot + total_amount
-                    self.machine_bet_in_round += total_amount
-                    self.current_bet = self.machine_bet_in_round
-                    
-                    self.log_message(f"Máquina: Raise para {total_amount} (Total na rodada: {self.machine_bet_in_round})")
-                    self.log_chip_state("Máquina Raise")
-                    self.betting_round_complete = False  # Reset flag as player needs to act again
-                else:
-                    # All-in raise
-                    self.machine.chips = 0
-                    self.game.pot = initial_pot + initial_machine_chips
-                    self.machine_bet_in_round += initial_machine_chips
-                    self.current_bet = self.machine_bet_in_round
-                    
-                    self.log_message(f"Máquina: All-in Raise para {initial_machine_chips} (Total na rodada: {self.machine_bet_in_round})")
-                    self.log_chip_state("Máquina All-in")
-                    self.betting_round_complete = False  # Reset flag
-        else:  # call/check
-            if self.current_bet > 0:
-                # Calculate call amount
-                call_amount = self.player_bet_in_round - self.machine_bet_in_round
-                
-                if call_amount > 0:
-                    if call_amount <= initial_machine_chips:
-                        # Standard call
-                        self.machine.chips = initial_machine_chips - call_amount
-                        self.game.pot = initial_pot + call_amount
-                        self.machine_bet_in_round += call_amount
-                        
-                        self.log_message(f"Máquina: Call {call_amount} (Total na rodada: {self.machine_bet_in_round})")
-                        self.log_chip_state("Máquina Call")
-                    else:
-                        # All-in call
-                        self.machine.chips = 0
-                        self.game.pot = initial_pot + initial_machine_chips
-                        self.machine_bet_in_round += initial_machine_chips
-                        
-                        self.log_message(f"Máquina: All-in Call {initial_machine_chips} (Total na rodada: {self.machine_bet_in_round})")
-                        self.log_chip_state("Máquina All-in")
-                else:
-                    # Check (bet already matched)
-                    self.log_message(f"Máquina: Check (Total na rodada: {self.machine_bet_in_round})")
-                    self.log_chip_state("Máquina Check")
+            # Calculate call and raise amounts
+            call_amount = self.player_bet_in_round - self.machine_bet_in_round
+            raise_amount = self.game.min_raise
+            total_amount = call_amount + raise_amount
+
+            if total_amount <= self.machine.chips:
+                # Standard raise
+                self.machine.chips -= total_amount
+                self.game.pot += total_amount
+                self.machine_bet_in_round += total_amount
+                self.current_bet = self.machine_bet_in_round
+
+                self.log_message(f"Máquina: Raise para {total_amount} (Total na rodada: {self.machine_bet_in_round})")
+                self.log_chip_state("Máquina Raise")
+                self.betting_round_complete = False  # Reset flag as player needs to act again
             else:
-                # Check (no bet to match)
+                # All-in raise
+                all_in_amount = self.machine.chips
+                self.machine.chips = 0
+                self.game.pot += all_in_amount
+                self.machine_bet_in_round += all_in_amount
+                self.current_bet = self.machine_bet_in_round
+
+                self.log_message(f"Máquina: All-in Raise para {all_in_amount} (Total na rodada: {self.machine_bet_in_round})")
+                self.log_chip_state("Máquina All-in")
+                self.betting_round_complete = False  # Reset flag
+        else:  # call/check
+            # Calculate call amount
+            call_amount = self.player_bet_in_round - self.machine_bet_in_round
+
+            if call_amount > 0:
+                if call_amount <= self.machine.chips:
+                    # Standard call
+                    self.machine.chips -= call_amount
+                    self.game.pot += call_amount
+                    self.machine_bet_in_round += call_amount
+
+                    self.log_message(f"Máquina: Call {call_amount} (Total na rodada: {self.machine_bet_in_round})")
+                    self.log_chip_state("Máquina Call")
+                else:
+                    # All-in call
+                    all_in_amount = self.machine.chips
+                    self.machine.chips = 0
+                    self.game.pot += all_in_amount
+                    self.machine_bet_in_round += all_in_amount
+
+                    self.log_message(f"Máquina: All-in Call {all_in_amount} (Total na rodada: {self.machine_bet_in_round})")
+                    self.log_chip_state("Máquina All-in")
+            else:
+                # Check (bet already matched)
                 self.log_message(f"Máquina: Check (Total na rodada: {self.machine_bet_in_round})")
                 self.log_chip_state("Máquina Check")
+
+        # Update chip displays after machine action
+        self.update_chip_displays()
 
     def check_game_state(self):
         """Check game state and advance to next phase if needed"""
@@ -1133,6 +1325,9 @@ class PokerGUI:
                 self.machine.game_sequence['biggest_pot_won'] = pot_amount
             self.game.pot = 0  # Clear the pot
             self.log_chip_state("Máquina vence o pote")
+
+        # Update chip displays after pot is awarded
+        self.update_chip_displays()
 
         # Log chip counts after pot is awarded
         self.log_message(f"\n💰 Depois do pagamento - Jogador 1: {self.player.chips}, Máquina: {self.machine.chips} chips")
@@ -1429,6 +1624,15 @@ DICAS PARA INICIANTES:
             # Pack scrollbar and canvas
             scrollbar.pack(side="right", fill="y")
             canvas.pack(side="left", fill="both", expand=True)
+
+    def _on_mousewheel(self, event):
+        """Handle mouse wheel scrolling"""
+        if event.num == 5 or event.delta < 0:
+            # Scroll down (Linux: Button-5, Windows/Mac: negative delta)
+            self.canvas.yview_scroll(1, "units")
+        elif event.num == 4 or event.delta > 0:
+            # Scroll up (Linux: Button-4, Windows/Mac: positive delta)
+            self.canvas.yview_scroll(-1, "units")
 
 if __name__ == "__main__":
     try:
