@@ -66,7 +66,7 @@ class Game:
         self.current_bet = 0
         for player in players:
             if not player.folded:
-                action, amount = player.make_decision(self.community_cards, self.current_bet, self.min_raise)
+                action, amount = player.make_decision(self.community_cards, self.current_bet, self.min_raise, self.pot)
                 if action == "raise":
                     self.current_bet = amount
                 self.pot += amount

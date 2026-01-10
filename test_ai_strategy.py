@@ -27,7 +27,7 @@ def test_ai_decisions():
 
     decisions = []
     for i in range(5):
-        action, amount = machine.make_decision(community_cards, 50, 20)
+        action, amount = machine.make_decision(community_cards, 50, 20, 100)
         decisions.append(action)
         print(f"   Tentativa {i+1}: {action.upper()}" + (f" (valor: {amount})" if amount > 0 else ""))
 
@@ -75,7 +75,7 @@ def test_ai_decisions():
 
     decisions = []
     for i in range(5):
-        action, amount = machine.make_decision(community_cards, 50, 20)
+        action, amount = machine.make_decision(community_cards, 50, 20, 100)
         decisions.append(action)
         print(f"   Tentativa {i+1}: {action.upper()}" + (f" (valor: {amount})" if amount > 0 else ""))
 
@@ -103,7 +103,7 @@ def test_ai_decisions():
 
     decisions = []
     for i in range(5):
-        action, amount = machine.make_decision(community_cards, 50, 20)
+        action, amount = machine.make_decision(community_cards, 50, 20, 100)
         decisions.append(action)
         print(f"   Tentativa {i+1}: {action.upper()}" + (f" (valor: {amount})" if amount > 0 else ""))
 
@@ -129,7 +129,7 @@ def test_ai_decisions():
 
     decisions = []
     for i in range(5):
-        action, amount = machine.make_decision(community_cards, 800, 20)  # 80% do stack
+        action, amount = machine.make_decision(community_cards, 800, 20, 100)  # 80% do stack, pot=100
         decisions.append(action)
         print(f"   Tentativa {i+1}: {action.upper()}" + (f" (valor: {amount})" if amount > 0 else ""))
 

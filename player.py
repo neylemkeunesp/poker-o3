@@ -433,7 +433,183 @@ class Player:
                     update = max(-max_update, min(max_update, update))
                     self.q_table[s][a] += update
 
-    def make_decision(self, community_cards: List[Card], current_bet: int, min_raise: int) -> Tuple[str, int]:
+    def calculate_raise_size(self, community_cards: List[Card], current_bet: int, min_raise: int, pot_size: int) -> int:
+        """
+        Calcula o tamanho ideal do raise baseado em múltiplos fatores estratégicos.
+
+        Retorna o valor total a ser apostado (não apenas o raise).
+        """
+        hand_strength = self.evaluate_hand_strength(community_cards)
+        board_texture = self._evaluate_board_texture(community_cards) if community_cards else "none"
+        position = self.position if self.position else "unknown"
+
+        # Pot size atual (inclui aposta corrente)
+        effective_pot = pot_size + current_bet
+
+        # === 1. SIZING BASE PELO TIPO DE MÃO ===
+
+        # Mãos premium (0.8+): raise grande para proteção/value
+        if hand_strength >= 0.8:
+            base_multiplier = random.uniform(0.75, 1.0)  # 75-100% do pot
+
+        # Mãos fortes (0.6-0.8): raise médio-grande
+        elif hand_strength >= 0.6:
+            base_multiplier = random.uniform(0.5, 0.75)  # 50-75% do pot
+
+        # Mãos médias (0.4-0.6): raise pequeno-médio
+        elif hand_strength >= 0.4:
+            base_multiplier = random.uniform(0.33, 0.5)  # 33-50% do pot
+
+        # Mãos fracas/bluff (< 0.4): raise pequeno (bluff ou fold)
+        else:
+            base_multiplier = random.uniform(0.25, 0.4)  # 25-40% do pot (bluff sizing)
+
+        # === 2. AJUSTES POR FASE DO JOGO ===
+
+        phase_multiplier = 1.0
+        if len(community_cards) == 0:  # Pré-flop
+            # Pré-flop: raises maiores para reduzir campo
+            phase_multiplier = 1.3
+
+        elif len(community_cards) == 3:  # Flop
+            # Flop: sizing padrão
+            phase_multiplier = 1.0
+
+        elif len(community_cards) == 4:  # Turn
+            # Turn: aumenta sizing (pote maior, menos cartas por vir)
+            phase_multiplier = 1.1
+
+        else:  # River (5 cartas)
+            # River: sizing variável baseado em value/bluff
+            if hand_strength >= 0.7:
+                phase_multiplier = 1.2  # Value bet grande
+            else:
+                phase_multiplier = 0.8  # Bluff menor
+
+        # === 3. AJUSTES POR TEXTURA DA MESA ===
+
+        texture_multiplier = 1.0
+        if board_texture == "very_wet":
+            # Mesa muito conectada: protege mãos fortes, bluff mais caro
+            if hand_strength >= 0.6:
+                texture_multiplier = 1.2  # Protege forte
+            else:
+                texture_multiplier = 0.9  # Bluff cauteloso
+
+        elif board_texture == "wet":
+            texture_multiplier = 1.05
+
+        elif board_texture == "dry":
+            # Mesa seca: pode fazer bluffs menores
+            if hand_strength < 0.4:
+                texture_multiplier = 0.85  # Bluff mais barato
+            else:
+                texture_multiplier = 1.0
+
+        elif board_texture == "paired":
+            # Mesa pareada: cauteloso
+            if hand_strength >= 0.7:
+                texture_multiplier = 1.1  # Value bet
+            else:
+                texture_multiplier = 0.9  # Bluff caro em mesa pareada
+
+        # === 4. AJUSTES POR POSIÇÃO ===
+
+        position_multiplier = 1.0
+        if "late" in str(position):
+            # Late position: pode fazer raises menores (informação vantajosa)
+            position_multiplier = 0.95
+        elif "early" in str(position):
+            # Early position: raises maiores (compensa desvantagem)
+            position_multiplier = 1.05
+
+        # === 5. AJUSTES POR STACK SIZE ===
+
+        stack_multiplier = 1.0
+        stack_ratio = self.chips / 1000.0  # Normalizado para 1000 fichas iniciais
+
+        if stack_ratio < 0.3:  # Short stack (< 30%)
+            # All-in ou fold mais frequente
+            if hand_strength >= 0.5:
+                # Com mão decente, tende ao all-in
+                stack_multiplier = 2.0
+            else:
+                stack_multiplier = 0.5  # Bluffs menores
+
+        elif stack_ratio > 2.0:  # Big stack (> 200%)
+            # Pode fazer raises maiores (pressure)
+            stack_multiplier = 1.15
+
+        # === 6. CONSIDERAÇÃO DE APOSTA EXISTENTE ===
+
+        # Se já houver uma aposta alta no board, ajusta accordingly
+        if current_bet > 0:
+            bet_to_pot_ratio = current_bet / max(effective_pot, 1)
+
+            # Se a aposta for muito grande em relação ao pot, seja mais cauteloso
+            if bet_to_pot_ratio > 0.5:
+                # Aposta grande já existe
+                if hand_strength >= 0.7:
+                    # Com mão forte, pode re-raise grande
+                    base_multiplier *= 1.2
+                else:
+                    # Com mão fraca/média, raise menor ou fold
+                    base_multiplier *= 0.8
+
+        # === 7. CÁLCULO FINAL ===
+
+        # Aplica todos os multiplicadores
+        final_multiplier = base_multiplier * phase_multiplier * texture_multiplier * position_multiplier * stack_multiplier
+
+        # Calcula raise em relação ao pot
+        pot_based_raise = int(effective_pot * final_multiplier)
+
+        # O raise deve ser pelo menos min_raise
+        min_total_bet = current_bet + min_raise
+
+        # O raise total é: call (current_bet) + raise adicional
+        desired_total_bet = current_bet + pot_based_raise
+
+        # Garante que está entre o mínimo e o máximo disponível
+        raise_size = max(min_total_bet, desired_total_bet)
+        raise_size = min(raise_size, self.chips)  # Não pode exceder fichas disponíveis
+
+        # === 8. LÓGICA DE ALL-IN ESTRATÉGICO ===
+
+        # Em situações específicas, considera all-in
+        should_consider_allin = False
+
+        # Short stack com mão boa
+        if stack_ratio < 0.4 and hand_strength >= 0.6:
+            should_consider_allin = True
+
+        # Mão muito forte em qualquer situação
+        if hand_strength >= 0.9:
+            should_consider_allin = True
+
+        # River com mão forte (value)
+        if len(community_cards) == 5 and hand_strength >= 0.75:
+            if random.random() < 0.3:  # 30% chance de overbet/all-in
+                should_consider_allin = True
+
+        # Se deve considerar all-in, decide probabilisticamente
+        if should_consider_allin:
+            allin_probability = hand_strength * 0.5  # Max 50% de chance
+            if random.random() < allin_probability:
+                raise_size = self.chips  # ALL-IN
+
+        # === 9. POLARIZAÇÃO (Value vs Bluff) ===
+
+        # Para criar range balanceado, ocasionalmente faz overbet bluff
+        if hand_strength < 0.3 and len(community_cards) >= 4:  # Turn ou River
+            # Bluff ocasional com sizing de value bet
+            if random.random() < 0.15:  # 15% chance de bluff grande
+                raise_size = int(raise_size * 1.5)
+                raise_size = min(raise_size, self.chips)
+
+        return raise_size
+
+    def make_decision(self, community_cards: List[Card], current_bet: int, min_raise: int, pot_size: int = 0) -> Tuple[str, int]:
             if self.is_machine:
                 state = self.get_state(community_cards, current_bet)
                 
@@ -491,13 +667,15 @@ class Player:
                     self.folded = True
                     return "fold", 0
                 elif action == "raise":
-                    raise_amount = min(current_bet + min_raise, self.chips)
-                    if raise_amount >= self.chips:
-                        raise_amount = self.chips
-                        return "raise", raise_amount
-                    else:
-                        self.chips -= raise_amount
-                        return "raise", raise_amount
+                    # Usa estratégia de raise variável inteligente
+                    raise_amount = self.calculate_raise_size(community_cards, current_bet, min_raise, pot_size)
+
+                    # Garante que não excede fichas disponíveis
+                    raise_amount = min(raise_amount, self.chips)
+
+                    # Deduz fichas e retorna
+                    self.chips -= raise_amount
+                    return "raise", raise_amount
                 else:  # call
                     bet_amount = min(current_bet, self.chips)
                     if bet_amount >= self.chips:
