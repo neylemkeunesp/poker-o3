@@ -284,9 +284,16 @@ class Player:
             "Straight Flush": 0.98,
             "Royal Flush": 1.0
         }
-        
-        # Adiciona bônus para cartas altas
-        high_card_bonus = hand_value / 14.0 * 0.1
+
+        # Adiciona bônus para cartas altas (extrai apenas o valor adicional, não o base)
+        # hand_value tem formato: base + carta_alta (ex: 100 + 14 para Ás)
+        # Extrair apenas o valor da carta
+        base_values = {"Carta Alta": 100, "Par": 200, "Dois Pares": 300, "Trinca": 400,
+                      "Sequência": 500, "Flush": 600, "Full House": 700, "Quadra": 800,
+                      "Straight Flush": 900, "Royal Flush": 1000}
+        base_value = base_values.get(hand_type, 0)
+        card_value = hand_value - base_value  # Extrair apenas o valor adicional
+        high_card_bonus = (card_value / 14.0) * 0.05  # Bônus menor e proporcional
         
         # Adiciona bônus para draws
         draw_bonus = 0.0
@@ -442,72 +449,216 @@ class Player:
     def make_decision(self, community_cards: List[Card], current_bet: int, min_raise: int) -> Tuple[str, int]:
             if self.is_machine:
                 state = self.get_state(community_cards, current_bet)
-                
+
+                # Initialize Q-table for new states
                 if state not in self.q_table:
-                    # More balanced initial Q-values with randomization
                     hand_strength = self.evaluate_hand_strength(community_cards)
-                    position_factor = 1.1 if "late" in state else 0.9  # Reduced position impact
+                    position_factor = 1.1 if "late" in state else 0.9
                     texture_factor = 1.1 if "wet" in state or "very_wet" in state else 1.0
-                    
-                    # Add small random variation to prevent identical initial values
+
                     random_factor = lambda: random.uniform(-0.05, 0.05)
-                    
-                    # More conservative base values
+
                     fold_base = -0.1 - (hand_strength * 0.2) + random_factor()
                     call_base = 0.0 + (hand_strength * 0.3) * position_factor + random_factor()
                     raise_base = -0.05 + (hand_strength * 0.4) * position_factor * texture_factor + random_factor()
-                    
-                    # More balanced preflop adjustments
+
                     if len(community_cards) == 0:
-                        if hand_strength > 0.7:  # Premium hands
+                        if hand_strength > 0.7:
                             fold_base -= 0.1
                             raise_base += 0.2
-                        elif hand_strength > 0.5:  # Playable hands
+                        elif hand_strength > 0.5:
                             call_base += 0.1
-                    
+
                     self.q_table[state] = {
                         'fold': fold_base,
                         'call': call_base,
                         'raise': raise_base
                     }
-                
-                # Simplified decision making for human games
-                if not hasattr(self, 'last_action'):
-                    hand_strength = self.evaluate_hand_strength(community_cards)
-                    
-                    # Base decision on hand strength
-                    if hand_strength > 0.8:  # Very strong hand
-                        action = 'raise'
-                    elif hand_strength > 0.5:  # Decent hand
-                        action = 'call'
-                    else:  # Weak hand
-                        action = 'fold' if current_bet > self.chips * 0.1 else 'call'
+
+                # ===== ESTRATÉGIA MELHORADA =====
+                hand_strength = self.evaluate_hand_strength(community_cards)
+
+                # Calcular pot odds e implied odds
+                pot_size = current_bet * 2  # Aproximação do pote atual
+                bet_to_call = current_bet
+
+                # Evitar divisão por zero
+                if bet_to_call == 0:
+                    pot_odds = 0
                 else:
-                    # Don't make consecutive raises
-                    action = 'call' if self.last_action == 'raise' else 'call'
-                
-                # Store last action
-                self.last_action = action
-                
-                # Store state and action for Q-value update
+                    pot_odds = pot_size / (pot_size + bet_to_call) if (pot_size + bet_to_call) > 0 else 0
+
+                # Fator de risco baseado no tamanho da aposta
+                bet_size_ratio = bet_to_call / self.chips if self.chips > 0 else 1
+
+                # Inicializar tracking de ações se necessário
+                if not hasattr(self, 'action_history'):
+                    self.action_history = []
+                if not hasattr(self, 'consecutive_raises'):
+                    self.consecutive_raises = 0
+
+                # Usar Q-table com epsilon-greedy (exploração vs exploitação)
+                epsilon = max(0.1, 0.3 - (self.game_sequence.get('hands_played', 0) * 0.01))
+
+                if random.random() < epsilon:
+                    # Exploração: decisão aleatória ponderada pela força da mão
+                    weights = {
+                        'fold': max(0.1, 1.0 - hand_strength),
+                        'call': max(0.2, hand_strength * 0.8),
+                        'raise': max(0.1, hand_strength * 1.2)
+                    }
+                    total_weight = sum(weights.values())
+                    normalized_weights = {k: v/total_weight for k, v in weights.items()}
+
+                    actions = list(normalized_weights.keys())
+                    probabilities = list(normalized_weights.values())
+                    action = np.random.choice(actions, p=probabilities)
+                else:
+                    # Exploitação: usar Q-table
+                    q_values = self.q_table[state]
+                    action = max(q_values, key=q_values.get)
+
+                # ===== AJUSTES ESTRATÉGICOS BASEADOS EM CONTEXTO =====
+
+                # REGRA ESPECIAL: Apostas all-in ou quase (>70%) requerem mãos feitas muito fortes
+                if bet_size_ratio > 0.7:
+                    # Verificar se tem mão feita forte (não apenas draw)
+                    hand_type, hand_value = self.get_hand_value(community_cards)
+                    made_hands = ["Flush", "Full House", "Quadra", "Straight Flush", "Royal Flush"]
+                    strong_pairs = ["Trinca", "Dois Pares"]
+
+                    if hand_type not in made_hands and hand_type not in strong_pairs:
+                        # Não pagar aposta gigante com apenas draws ou pares fracos
+                        action = 'fold'
+
+                # 1. FOLD: Desistir com mãos fracas ou apostas muito altas
+                if action == 'fold':
+                    # Sempre fazer fold com mãos muito fracas e apostas significativas
+                    if hand_strength < 0.3 and bet_size_ratio > 0.15:
+                        pass  # Manter fold
+                    # Considerar pot odds para draws
+                    elif hand_strength >= 0.4 and pot_odds > 0.3:
+                        action = 'call'  # Pot odds favoráveis, vale a pena ver
+                    # Não fazer fold com mãos boas
+                    elif hand_strength > 0.6:
+                        action = 'call'  # Mão boa demais para desistir
+
+                # 2. CALL: Pagar apostas
+                elif action == 'call':
+                    # Apostas gigantes (>70% do stack) - apenas para nuts
+                    if bet_size_ratio > 0.7:
+                        if hand_strength < 0.85:
+                            action = 'fold'  # Só continuar com as melhores mãos
+                    # Apostas muito altas (>50% do stack) requerem mãos muito fortes
+                    elif bet_size_ratio > 0.5 and hand_strength < 0.7:
+                        # 80% de chance de fold com aposta gigante e mão não premium
+                        if random.random() < 0.8:
+                            action = 'fold'
+                    # Com mãos muito fortes, considerar raise em vez de call
+                    elif hand_strength > 0.75 and bet_size_ratio < 0.3:
+                        # 40% de chance de raise com mão forte
+                        if random.random() < 0.4:
+                            action = 'raise'
+                    # Com mãos médias e apostas altas, considerar fold
+                    elif hand_strength < 0.4 and bet_size_ratio > 0.25:
+                        # 60% de chance de fold com mão fraca e aposta alta
+                        if random.random() < 0.6:
+                            action = 'fold'
+                    # Semi-blefe com draws
+                    elif 0.5 < hand_strength < 0.7 and len(community_cards) >= 3 and bet_size_ratio < 0.3:
+                        # 25% de chance de raise com draw (apenas se aposta não for muito alta)
+                        if random.random() < 0.25:
+                            action = 'raise'
+
+                # 3. RAISE: Aumentar aposta
+                elif action == 'raise':
+                    # Evitar raises consecutivos excessivos
+                    if self.consecutive_raises >= 2:
+                        action = 'call'  # Não ser muito agressivo
+                    # Com mãos fracas, ocasionalmente blefar
+                    elif hand_strength < 0.35 and bet_size_ratio < 0.15:
+                        # 70% de chance de recuar do raise se mão muito fraca
+                        if random.random() < 0.7:
+                            action = 'fold' if bet_to_call > 0 else 'call'
+                    # Limitar raises com stack baixo
+                    elif self.chips < 200 and bet_size_ratio > 0.4:
+                        action = 'call'  # Preservar fichas
+
+                # ===== ESTRATÉGIA PRÉ-FLOP ESPECÍFICA =====
+                if len(community_cards) == 0:
+                    preflop_strength = self.evaluate_preflop_hand()
+
+                    # Mãos premium (AA, KK, QQ, AK): jogar agressivo
+                    if preflop_strength > 0.75:
+                        if action == 'call' and random.random() < 0.6:
+                            action = 'raise'
+                    # Mãos especulativas (pares baixos, suited connectors)
+                    elif 0.4 < preflop_strength < 0.6:
+                        if action == 'raise':
+                            action = 'call'  # Ser mais conservador
+                        if bet_size_ratio > 0.2:
+                            action = 'fold'  # Não pagar muito por mãos especulativas
+                    # Lixo (7-2, 8-3, etc)
+                    elif preflop_strength < 0.3:
+                        if bet_to_call > min_raise:
+                            action = 'fold'  # Descartar lixo
+
+                # ===== ESTRATÉGIA PÓS-FLOP =====
+                if len(community_cards) >= 3:
+                    # Com monstros (full house+), slow play ocasionalmente
+                    if hand_strength > 0.85 and random.random() < 0.3:
+                        if action == 'raise':
+                            action = 'call'  # Slow play para extrair valor
+
+                    # No river, ser mais cauteloso
+                    if len(community_cards) == 5:
+                        # Não blefar tanto no river
+                        if hand_strength < 0.4 and action == 'raise':
+                            action = 'fold' if bet_to_call > 0 else 'call'
+
+                # Atualizar histórico de ações
+                self.action_history.append(action)
+                if action == 'raise':
+                    self.consecutive_raises += 1
+                else:
+                    self.consecutive_raises = 0
+
+                # Limitar histórico a últimas 10 ações
+                if len(self.action_history) > 10:
+                    self.action_history.pop(0)
+
+                # Store state and action for Q-learning
                 self.last_state = state
                 self.last_action = action
-                
+
+                # ===== EXECUTAR AÇÃO =====
                 if action == "fold":
                     self.folded = True
                     return "fold", 0
+
                 elif action == "raise":
-                    raise_amount = min(current_bet + min_raise, self.chips)
-                    if raise_amount >= self.chips:
-                        raise_amount = self.chips
+                    # Variar tamanho do raise baseado na situação
+                    if hand_strength > 0.8:
+                        # Raise grande com mãos fortes (1.5x a 2.5x do mínimo)
+                        raise_multiplier = random.uniform(1.5, 2.5)
+                    elif hand_strength > 0.6:
+                        # Raise médio com mãos boas (1x a 1.5x do mínimo)
+                        raise_multiplier = random.uniform(1.0, 1.5)
+                    else:
+                        # Raise pequeno para blefes (0.8x a 1.2x do mínimo)
+                        raise_multiplier = random.uniform(0.8, 1.2)
+
+                    raise_amount = int(min_raise * raise_multiplier)
+                    raise_amount = min(raise_amount, self.chips)
+                    raise_amount = max(min_raise, raise_amount)  # Nunca menos que o mínimo
+
                     return "raise", raise_amount
+
                 else:  # call
                     bet_amount = min(current_bet, self.chips)
-                    if bet_amount >= self.chips:
-                        bet_amount = self.chips
 
-                    # Save Q-table after significant actions
-                    if self.is_machine:
+                    # Save Q-table periodically
+                    if self.is_machine and random.random() < 0.1:
                         self.save_q_table()
 
                     return "call", bet_amount

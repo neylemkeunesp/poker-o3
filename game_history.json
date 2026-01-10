@@ -3020,5 +3020,392 @@
             "best_hand": null,
             "biggest_pot_won": 170
         }
+    },
+    {
+        "winner": "M\u00e1quina",
+        "pot": 100,
+        "community_cards": "Dama de Espadas, Rei de Copas, \u00c1s de Copas, 2 de Copas, 6 de Paus",
+        "player_hand": "3 de Ouros, 5 de Ouros",
+        "machine_hand": "Rei de Ouros, 8 de Ouros",
+        "player_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 0,
+            "total_losses": 100,
+            "best_hand": null,
+            "biggest_pot_won": 0
+        },
+        "machine_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 100,
+            "total_losses": 0,
+            "best_hand": null,
+            "biggest_pot_won": 100
+        }
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 140,
+        "community_cards": "5 de Ouros, Rei de Espadas, Rei de Copas, 2 de Copas, \u00c1s de Copas",
+        "player_hand": "8 de Copas, 6 de Copas",
+        "machine_hand": "8 de Paus, 5 de Copas",
+        "player_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 140,
+            "total_losses": 100,
+            "best_hand": null,
+            "biggest_pot_won": 140
+        },
+        "machine_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 100,
+            "total_losses": 140,
+            "best_hand": null,
+            "biggest_pot_won": 100
+        }
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 2000,
+        "community_cards": "5 de Espadas, 2 de Espadas, 4 de Ouros, 9 de Paus, 6 de Espadas",
+        "player_hand": "8 de Paus, 3 de Espadas",
+        "machine_hand": "Valete de Ouros, 4 de Copas",
+        "player_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 2000,
+            "total_losses": 0,
+            "best_hand": null,
+            "biggest_pot_won": 2000
+        },
+        "machine_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 0,
+            "total_losses": 2000,
+            "best_hand": null,
+            "biggest_pot_won": 0
+        }
+    },
+    {
+        "winner": "M\u00e1quina",
+        "pot": 160,
+        "community_cards": "Dama de Paus, Dama de Ouros, Rei de Ouros, 7 de Copas, 3 de Espadas",
+        "player_hand": "3 de Copas, 4 de Paus",
+        "machine_hand": "Dama de Espadas, Rei de Copas",
+        "player_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 0,
+            "total_losses": 160,
+            "best_hand": null,
+            "biggest_pot_won": 0
+        },
+        "machine_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 160,
+            "total_losses": 0,
+            "best_hand": null,
+            "biggest_pot_won": 160
+        }
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 140,
+        "community_cards": "4 de Espadas, 9 de Copas, 6 de Ouros, Dama de Espadas, 8 de Paus",
+        "player_hand": "8 de Espadas, 10 de Espadas",
+        "machine_hand": "10 de Copas, 9 de Espadas",
+        "player_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 140,
+            "total_losses": 160,
+            "best_hand": null,
+            "biggest_pot_won": 140
+        },
+        "machine_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 160,
+            "total_losses": 140,
+            "best_hand": null,
+            "biggest_pot_won": 160
+        }
+    },
+    {
+        "winner": "M\u00e1quina",
+        "pot": 200,
+        "community_cards": "10 de Espadas, 4 de Copas, Dama de Espadas, 7 de Copas, 6 de Espadas",
+        "player_hand": "10 de Ouros, 5 de Copas",
+        "machine_hand": "10 de Paus, Valete de Ouros",
+        "player_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 140,
+            "total_losses": 360,
+            "best_hand": null,
+            "biggest_pot_won": 140
+        },
+        "machine_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 360,
+            "total_losses": 140,
+            "best_hand": null,
+            "biggest_pot_won": 200
+        }
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 200,
+        "community_cards": "5 de Copas, Valete de Paus, 8 de Ouros, 10 de Copas, 9 de Copas",
+        "player_hand": "Dama de Paus, 4 de Paus",
+        "machine_hand": "4 de Ouros, 3 de Ouros",
+        "player_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 340,
+            "total_losses": 360,
+            "best_hand": null,
+            "biggest_pot_won": 200
+        },
+        "machine_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 360,
+            "total_losses": 340,
+            "best_hand": null,
+            "biggest_pot_won": 200
+        }
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 210,
+        "community_cards": "5 de Copas, 2 de Ouros, 5 de Paus, Rei de Paus",
+        "player_hand": "Rei de Ouros, \u00c1s de Copas",
+        "machine_hand": "10 de Copas, 3 de Paus",
+        "player_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 550,
+            "total_losses": 360,
+            "best_hand": null,
+            "biggest_pot_won": 210
+        },
+        "machine_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 360,
+            "total_losses": 550,
+            "best_hand": null,
+            "biggest_pot_won": 200
+        }
+    },
+    {
+        "winner": "Jogador 1",
+        "pot": 660,
+        "community_cards": "2 de Espadas, 9 de Copas, 4 de Espadas, 2 de Paus, 7 de Copas",
+        "player_hand": "2 de Copas, 6 de Paus",
+        "machine_hand": "10 de Espadas, Valete de Espadas",
+        "player_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 1210,
+            "total_losses": 360,
+            "best_hand": null,
+            "biggest_pot_won": 660
+        },
+        "machine_stats": {
+            "hand_frequencies": {
+                "Royal Flush": 0,
+                "Straight Flush": 0,
+                "Quadra": 0,
+                "Full House": 0,
+                "Flush": 0,
+                "Sequ\u00eancia": 0,
+                "Trinca": 0,
+                "Dois Pares": 0,
+                "Par": 0,
+                "Carta Alta": 0
+            },
+            "total_winnings": 360,
+            "total_losses": 1210,
+            "best_hand": null,
+            "biggest_pot_won": 200
+        }
     }
 ]

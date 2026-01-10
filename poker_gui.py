@@ -1053,9 +1053,25 @@ class PokerGUI:
         """Player chooses to raise"""
         # First match the current bet, then add the raise amount
         call_amount = self.machine_bet_in_round - self.player_bet_in_round
-        raise_amount = self.game.min_raise
+
+        # Calculate minimum and maximum raise amounts
+        min_raise = self.game.min_raise
+        max_raise = self.player.chips - call_amount
+
+        if max_raise < min_raise:
+            # Not enough chips for a valid raise
+            self.log_message("⚠️ Chips insuficientes para raise! Use Call para all-in.")
+            return
+
+        # Show dialog to get raise amount from player
+        raise_amount = self.get_raise_amount(call_amount, min_raise, max_raise)
+
+        if raise_amount is None:
+            # User cancelled the dialog
+            return
+
         total_amount = call_amount + raise_amount
-        
+
         if total_amount <= self.player.chips:
             # Standard raise
             self.player.chips -= total_amount
@@ -1109,6 +1125,218 @@ class PokerGUI:
         else:
             # Not enough chips even for the call - must go all-in with call
             self.log_message("⚠️ Chips insuficientes para raise! Use Call para all-in.")
+
+    def get_raise_amount(self, call_amount, min_raise, max_raise):
+        """Show dialog to get raise amount from player"""
+        # Create custom dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Definir Valor do Aumento")
+        dialog.geometry("500x350")
+        dialog.configure(bg=self.colors['bg_dark'])
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Center the dialog on the screen
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
+        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+
+        # Container frame
+        container = tk.Frame(dialog, bg=self.colors['bg_medium'], padx=20, pady=20)
+        container.pack(expand=True, fill='both', padx=10, pady=10)
+
+        # Title
+        title_label = tk.Label(
+            container,
+            text="💰 DEFINIR AUMENTO",
+            font=('Segoe UI', 16, 'bold'),
+            fg=self.colors['accent_gold'],
+            bg=self.colors['bg_medium']
+        )
+        title_label.pack(pady=(0, 15))
+
+        # Info frame
+        info_frame = tk.Frame(container, bg=self.colors['bg_light'], padx=15, pady=10)
+        info_frame.pack(fill='x', pady=(0, 15))
+
+        # Display current situation
+        info_text = f"Suas fichas: {self.player.chips}\n"
+        if call_amount > 0:
+            info_text += f"Valor para pagar (call): {call_amount}\n"
+        info_text += f"Aumento mínimo: {min_raise}\n"
+        info_text += f"Aumento máximo: {max_raise}"
+
+        info_label = tk.Label(
+            info_frame,
+            text=info_text,
+            font=('Segoe UI', 11),
+            fg=self.colors['text_white'],
+            bg=self.colors['bg_light'],
+            justify='left'
+        )
+        info_label.pack(anchor='w')
+
+        # Input frame
+        input_frame = tk.Frame(container, bg=self.colors['bg_medium'])
+        input_frame.pack(fill='x', pady=(0, 10))
+
+        input_label = tk.Label(
+            input_frame,
+            text="Valor do aumento:",
+            font=('Segoe UI', 12, 'bold'),
+            fg=self.colors['text_white'],
+            bg=self.colors['bg_medium']
+        )
+        input_label.pack(side='left', padx=(0, 10))
+
+        # Entry field with validation
+        entry_var = tk.StringVar(value=str(min_raise))
+        entry = tk.Entry(
+            input_frame,
+            textvariable=entry_var,
+            font=('Segoe UI', 12),
+            width=15,
+            bg=self.colors['bg_light'],
+            fg=self.colors['text_white'],
+            insertbackground=self.colors['text_white']
+        )
+        entry.pack(side='left')
+        entry.focus_set()
+        entry.select_range(0, tk.END)
+
+        # Error message label
+        error_label = tk.Label(
+            container,
+            text="",
+            font=('Segoe UI', 10),
+            fg=self.colors['accent_red'],
+            bg=self.colors['bg_medium']
+        )
+        error_label.pack(pady=(0, 10))
+
+        # Store result
+        result = {'value': None}
+
+        def validate_and_confirm():
+            try:
+                value = int(entry_var.get())
+                if value < min_raise:
+                    error_label.config(text=f"⚠️ O aumento deve ser pelo menos {min_raise}")
+                    return
+                if value > max_raise:
+                    error_label.config(text=f"⚠️ O aumento não pode ser maior que {max_raise}")
+                    return
+                result['value'] = value
+                dialog.destroy()
+            except ValueError:
+                error_label.config(text="⚠️ Por favor, digite um número válido")
+
+        def cancel():
+            result['value'] = None
+            dialog.destroy()
+
+        # Quick bet buttons
+        quick_bet_frame = tk.Frame(container, bg=self.colors['bg_medium'])
+        quick_bet_frame.pack(fill='x', pady=(0, 15))
+
+        quick_bet_label = tk.Label(
+            quick_bet_frame,
+            text="Apostas rápidas:",
+            font=('Segoe UI', 10),
+            fg=self.colors['text_gray'],
+            bg=self.colors['bg_medium']
+        )
+        quick_bet_label.pack(anchor='w', pady=(0, 5))
+
+        # Calculate quick bet amounts
+        pot_size = self.game.pot if self.game else 0
+        quick_bets = []
+
+        # Minimum raise
+        quick_bets.append(("Mínimo", min_raise))
+
+        # Pot-sized raises if they're different from min/max
+        if pot_size > 0:
+            half_pot = max(min_raise, min(pot_size // 2, max_raise))
+            if half_pot != min_raise and half_pot != max_raise:
+                quick_bets.append(("½ Pote", half_pot))
+
+            full_pot = max(min_raise, min(pot_size, max_raise))
+            if full_pot != min_raise and full_pot != max_raise:
+                quick_bets.append(("Pote", full_pot))
+
+        # All-in
+        if max_raise != min_raise:
+            quick_bets.append(("All-in", max_raise))
+
+        # Create buttons for quick bets
+        quick_buttons_frame = tk.Frame(quick_bet_frame, bg=self.colors['bg_medium'])
+        quick_buttons_frame.pack(fill='x')
+
+        for label, amount in quick_bets:
+            btn = tk.Button(
+                quick_buttons_frame,
+                text=f"{label}\n({amount})",
+                command=lambda a=amount: entry_var.set(str(a)),
+                font=('Segoe UI', 9),
+                bg=self.colors['bg_light'],
+                fg=self.colors['text_white'],
+                activebackground=self.colors['accent_blue'],
+                activeforeground=self.colors['text_white'],
+                relief=tk.FLAT,
+                padx=10,
+                pady=5,
+                cursor='hand2'
+            )
+            btn.pack(side='left', padx=5)
+
+        # Buttons frame
+        buttons_frame = tk.Frame(container, bg=self.colors['bg_medium'])
+        buttons_frame.pack(fill='x')
+
+        # Confirm button
+        confirm_btn = tk.Button(
+            buttons_frame,
+            text="✓ CONFIRMAR",
+            command=validate_and_confirm,
+            font=('Segoe UI', 11, 'bold'),
+            bg=self.colors['accent_green'],
+            fg='#000000',
+            activebackground='#05dd8e',
+            activeforeground='#000000',
+            relief=tk.FLAT,
+            padx=20,
+            pady=10,
+            cursor='hand2'
+        )
+        confirm_btn.pack(side='left', padx=(0, 10), expand=True, fill='x')
+
+        # Cancel button
+        cancel_btn = tk.Button(
+            buttons_frame,
+            text="✕ CANCELAR",
+            command=cancel,
+            font=('Segoe UI', 11, 'bold'),
+            bg=self.colors['accent_red'],
+            fg='#ffffff',
+            activebackground='#e0005d',
+            activeforeground='#ffffff',
+            relief=tk.FLAT,
+            padx=20,
+            pady=10,
+            cursor='hand2'
+        )
+        cancel_btn.pack(side='left', expand=True, fill='x')
+
+        # Bind Enter key to confirm
+        entry.bind('<Return>', lambda e: validate_and_confirm())
+        dialog.bind('<Escape>', lambda e: cancel())
+
+        # Wait for dialog to close
+        dialog.wait_window()
+
+        return result['value']
 
     def fold_action(self):
         """Player chooses to fold"""
