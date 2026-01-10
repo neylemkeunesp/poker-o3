@@ -817,10 +817,12 @@ class Game:
             winner.chips += self.pot
             return
         
-        # Compare hands
+        # Compare hands - now using tuple comparison for proper tie-breaking
         hand_values = [(p, p.get_hand_value(self.community_cards)) for p in active_players]
         if hand_values:  # Only proceed if there are hands to compare
+            # x[1] is (hand_name, hand_value_tuple), so x[1][1] is the tuple we compare
             best_value = max(hand_values, key=lambda x: x[1][1])
+            # Find all players with the exact same hand value tuple
             winners = [p for p, v in hand_values if v[1] == best_value[1][1]]
         
         # Award the pot without any chip rebalancing

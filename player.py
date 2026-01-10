@@ -61,119 +61,135 @@ class Player:
     def show_hand(self):
         return ", ".join(str(card) for card in self.hand)
 
-    def get_hand_value(self, community_cards: List[Card]) -> Tuple[str, int]:
+    def get_hand_value(self, community_cards: List[Card]) -> Tuple[str, Tuple[int, ...]]:
+        """
+        Retorna o nome da mão e uma tupla com valores para comparação.
+        A tupla tem formato: (base_value, card1, card2, card3, card4, card5)
+        onde card1-5 representam as 5 cartas da melhor mão em ordem de importância.
+        """
         all_cards = self.hand + community_cards
 
         if not all_cards:
-            return "Carta Alta", 100  # Return a default value if there are no cards
-        
-        # Verifica sequência
-        values = sorted([card.value for card in all_cards])
-        straight = False
-        straight_high = 0
-        
-        # Verifica sequência normal
-        for i in range(len(values) - 4):
-            if values[i:i+5] == list(range(values[i], values[i]+5)):
-                straight = True
-                straight_high = values[i+4]
-                break
-        
-        # Verifica sequência A-5 (Ás baixo)
-        if not straight and 14 in values:  # Se tem Ás
-            values_with_low_ace = sorted([1 if v == 14 else v for v in values])
-            for i in range(len(values_with_low_ace) - 4):
-                if values_with_low_ace[i:i+5] == list(range(values_with_low_ace[i], values_with_low_ace[i]+5)):
-                    straight = True
-                    straight_high = values_with_low_ace[i+4]
-                    break
-        
-        # Verifica flush e straight flush
-        flush_suit = None
-        flush = False
-        for suit in Card.suits:
-            suited_cards = [card for card in all_cards if card.suit == suit]
-            if len(suited_cards) >= 5:
-                flush = True
-                flush_suit = suit
-                # Verifica Royal Flush
-                royal_values = {'10', 'J', 'Q', 'K', 'A'}
-                royal_cards = [card for card in suited_cards if card.rank in royal_values]
-                if len(royal_cards) == 5:
-                    return "Royal Flush", 1000  # Valor alto para garantir que vence todas as outras mãos
-                break
+            return "Carta Alta", (100, 0, 0, 0, 0, 0)
 
-        # Verifica straight flush
-        if flush:
-            suited_cards = sorted([card for card in all_cards if card.suit == flush_suit], key=lambda x: x.value)
-            if len(suited_cards) >= 5:  # Precisa de pelo menos 5 cartas do mesmo naipe
-                # Verifica sequência normal
-                for i in range(len(suited_cards) - 4):
-                    values = [c.value for c in suited_cards[i:i+5]]
-                    if values == list(range(min(values), max(values) + 1)) and len(values) == 5:
-                        return "Straight Flush", 900 + max(values)
-                
-                # Verifica sequência A-5 em flush
-                if 14 in [c.value for c in suited_cards]:  # Se tem Ás
-                    ace_low_values = []
-                    for c in suited_cards:
-                        if c.value == 14:
-                            ace_low_values.append(1)
-                        else:
-                            ace_low_values.append(c.value)
-                    ace_low_values.sort()
-                    
-                    for i in range(len(ace_low_values) - 4):
-                        values = ace_low_values[i:i+5]
-                        if values == list(range(min(values), max(values) + 1)) and len(values) == 5:
-                            return "Straight Flush", 900 + max(values)
+        # Ordena todas as cartas por valor decrescente
+        sorted_cards = sorted(all_cards, key=lambda x: x.value, reverse=True)
 
         # Conta pares, trincas, quadras
         rank_count: Dict[str, int] = {}
         for card in all_cards:
             rank_count[card.rank] = rank_count.get(card.rank, 0) + 1
-        
-        # Quadra (valor base 800)
-        for rank, count in rank_count.items():
-            if count == 4:
-                return "Quadra", 800 + Card.rank_values[rank]
-        
-        # Full house (valor base 700)
-        has_three = False
-        has_pair = False
-        three_value = 0
-        for rank, count in rank_count.items():
-            if count == 3:
-                has_three = True
-                three_value = Card.rank_values[rank]
-            elif count == 2:
-                has_pair = True
-        if has_three and has_pair:
-            return "Full House", 700 + three_value
-        
-        # Flush (valor base 600)
-        if flush:
-            return "Flush", 600 + max(card.value for card in all_cards)
-        
-        # Sequência (valor base 500)
-        if straight:
-            return "Sequência", 500 + straight_high
-        
-        # Trinca (valor base 400)
-        if has_three:
-            return "Trinca", 400 + three_value
-        
-        # Dois pares (valor base 300)
-        pairs = [(rank, count) for rank, count in rank_count.items() if count == 2]
+
+        # Verifica flush
+        flush_suit = None
+        flush_cards = []
+        for suit in Card.suits:
+            suited_cards = sorted([card for card in all_cards if card.suit == suit],
+                                  key=lambda x: x.value, reverse=True)
+            if len(suited_cards) >= 5:
+                flush_suit = suit
+                flush_cards = suited_cards[:5]  # Pega as 5 maiores
+                break
+
+        # Função auxiliar para verificar sequências
+        def find_straight(cards_list):
+            """Retorna a maior sequência encontrada ou None"""
+            values = sorted(list(set([c.value for c in cards_list])), reverse=True)
+
+            # Verifica sequências normais (maior para menor)
+            for i in range(len(values) - 4):
+                if values[i] - values[i+4] == 4:  # Sequência de 5 cartas
+                    return [values[i], values[i+1], values[i+2], values[i+3], values[i+4]]
+
+            # Verifica sequência A-2-3-4-5 (wheel)
+            if 14 in values and 5 in values and 4 in values and 3 in values and 2 in values:
+                return [5, 4, 3, 2, 1]  # A conta como 1 nesse caso
+
+            return None
+
+        # Verifica Royal Flush
+        if flush_cards:
+            royal_values = {14, 13, 12, 11, 10}
+            if set(c.value for c in flush_cards[:5]) == royal_values:
+                return "Royal Flush", (1000, 14, 13, 12, 11, 10)
+
+        # Verifica Straight Flush
+        if flush_cards:
+            straight_values = find_straight(flush_cards)
+            if straight_values:
+                return "Straight Flush", (900, straight_values[0], straight_values[1],
+                                         straight_values[2], straight_values[3], straight_values[4])
+
+        # Quadra (Four of a Kind)
+        quads = [rank for rank, count in rank_count.items() if count == 4]
+        if quads:
+            quad_rank = quads[0]
+            quad_value = Card.rank_values[quad_rank]
+            # Encontra o melhor kicker
+            kickers = sorted([c.value for c in all_cards if c.rank != quad_rank], reverse=True)
+            kicker = kickers[0] if kickers else 0
+            return "Quadra", (800, quad_value, quad_value, quad_value, quad_value, kicker)
+
+        # Full House
+        threes = sorted([rank for rank, count in rank_count.items() if count == 3],
+                       key=lambda r: Card.rank_values[r], reverse=True)
+        pairs = sorted([rank for rank, count in rank_count.items() if count == 2],
+                      key=lambda r: Card.rank_values[r], reverse=True)
+
+        if threes and (pairs or len(threes) >= 2):
+            three_value = Card.rank_values[threes[0]]
+            # Se temos duas trincas, a segunda vira o par
+            if len(threes) >= 2:
+                pair_value = Card.rank_values[threes[1]]
+            else:
+                pair_value = Card.rank_values[pairs[0]]
+            return "Full House", (700, three_value, three_value, three_value, pair_value, pair_value)
+
+        # Flush
+        if flush_cards:
+            return "Flush", (600, flush_cards[0].value, flush_cards[1].value,
+                            flush_cards[2].value, flush_cards[3].value, flush_cards[4].value)
+
+        # Sequência (Straight)
+        straight_values = find_straight(all_cards)
+        if straight_values:
+            return "Sequência", (500, straight_values[0], straight_values[1],
+                                straight_values[2], straight_values[3], straight_values[4])
+
+        # Trinca (Three of a Kind)
+        if threes:
+            three_value = Card.rank_values[threes[0]]
+            # Encontra os 2 melhores kickers
+            kickers = sorted([c.value for c in all_cards if c.rank != threes[0]], reverse=True)
+            k1 = kickers[0] if len(kickers) > 0 else 0
+            k2 = kickers[1] if len(kickers) > 1 else 0
+            return "Trinca", (400, three_value, three_value, three_value, k1, k2)
+
+        # Dois Pares (Two Pair)
         if len(pairs) >= 2:
-            return "Dois Pares", 300 + max(Card.rank_values[rank] for rank, _ in pairs)
-        
-        # Par (valor base 200)
+            high_pair = Card.rank_values[pairs[0]]
+            low_pair = Card.rank_values[pairs[1]]
+            # Encontra o melhor kicker
+            kickers = sorted([c.value for c in all_cards if c.rank not in [pairs[0], pairs[1]]],
+                           reverse=True)
+            kicker = kickers[0] if kickers else 0
+            return "Dois Pares", (300, high_pair, high_pair, low_pair, low_pair, kicker)
+
+        # Par (One Pair)
         if len(pairs) == 1:
-            return "Par", 200 + Card.rank_values[pairs[0][0]]
-        
-        # Carta alta (valor base 100)
-        return "Carta Alta", 100 + max(card.value for card in all_cards)
+            pair_value = Card.rank_values[pairs[0]]
+            # Encontra os 3 melhores kickers
+            kickers = sorted([c.value for c in all_cards if c.rank != pairs[0]], reverse=True)
+            k1 = kickers[0] if len(kickers) > 0 else 0
+            k2 = kickers[1] if len(kickers) > 1 else 0
+            k3 = kickers[2] if len(kickers) > 2 else 0
+            return "Par", (200, pair_value, pair_value, k1, k2, k3)
+
+        # Carta Alta (High Card)
+        return "Carta Alta", (100, sorted_cards[0].value, sorted_cards[1].value if len(sorted_cards) > 1 else 0,
+                              sorted_cards[2].value if len(sorted_cards) > 2 else 0,
+                              sorted_cards[3].value if len(sorted_cards) > 3 else 0,
+                              sorted_cards[4].value if len(sorted_cards) > 4 else 0)
 
     def evaluate_preflop_hand(self) -> float:
         """
@@ -218,7 +234,7 @@ class Player:
             return self.evaluate_preflop_hand()
             
         hand_type, hand_value = self.get_hand_value(community_cards)
-        
+
         # Pontuação base pela força da mão
         hand_scores = {
             "Carta Alta": 0.1,
@@ -232,9 +248,9 @@ class Player:
             "Straight Flush": 0.98,
             "Royal Flush": 1.0
         }
-        
-        # Adiciona bônus para cartas altas
-        high_card_bonus = hand_value / 14.0 * 0.1
+
+        # Adiciona bônus para cartas altas (usa a primeira carta da tupla de valor)
+        high_card_bonus = hand_value[1] / 14.0 * 0.1 if len(hand_value) > 1 else 0.0
         
         # Adiciona bônus para draws
         draw_bonus = 0.0
