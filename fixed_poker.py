@@ -1357,15 +1357,20 @@ class PokerGUI:
             
             # Display hand results
             result = f"\nJogador 1 tem {player_type}\nMáquina tem {machine_type}\n"
-            
+
             if player_value > machine_value:
                 winner_name = "Jogador 1"
                 winner_hand_type = player_type
-            else:
+                result += f"🏆 {winner_name} vence!"
+            elif machine_value > player_value:
                 winner_name = "Máquina"
                 winner_hand_type = machine_type
-                
-            result += f"🏆 {winner_name} vence\!"
+                result += f"🏆 {winner_name} vence!"
+            else:  # Empate verdadeiro - split pot
+                winner_name = "Empate"
+                winner_hand_type = player_type
+                result += f"🤝 EMPATE! Pote dividido!"
+
             self.log_message(result)
         
         # Show winner banner
@@ -1375,13 +1380,18 @@ class PokerGUI:
             if self.winner_label is not None:
                 if winner_by_fold:
                     self.winner_label.config(
-                        text=f"🏆 {winner_name} VENCE POR DESISTÊNCIA\! 🏆",
+                        text=f"🏆 {winner_name} VENCE POR DESISTÊNCIA! 🏆",
                         fg="#FFD700" if winner_name == "Jogador 1" else "#FF6347"
                     )
-                    self.log_message(f"\n🏆 {winner_name} vence por desistência\!")
+                    self.log_message(f"\n🏆 {winner_name} vence por desistência!")
+                elif winner_name == "Empate":
+                    self.winner_label.config(
+                        text=f"🤝 EMPATE COM {winner_hand_type} - POTE DIVIDIDO! 🤝",
+                        fg="#90EE90"  # Verde claro para empate
+                    )
                 else:
                     self.winner_label.config(
-                        text=f"🏆 {winner_name} VENCE COM {winner_hand_type}\! 🏆",
+                        text=f"🏆 {winner_name} VENCE COM {winner_hand_type}! 🏆",
                         fg="#FFD700" if winner_name == "Jogador 1" else "#FF6347"
                     )
 
@@ -1390,9 +1400,12 @@ class PokerGUI:
         if winner_name == "Jogador 1":
             self.player_wins += 1
             self.current_streak = max(1, self.current_streak + 1)
-        else:
+        elif winner_name == "Máquina":
             self.machine_wins += 1
             self.current_streak = min(-1, self.current_streak - 1)
+        else:  # Empate
+            # Ties don't affect win counters or streaks
+            self.current_streak = 0
 
         # Award the pot to the winner
         if winner_name == "Jogador 1":
@@ -1404,7 +1417,7 @@ class PokerGUI:
                 self.player.game_sequence['biggest_pot_won'] = pot_amount
             self.game.pot = 0  # Clear the pot
             self.log_chip_state("Jogador vence o pote")
-        else:
+        elif winner_name == "Máquina":
             pot_amount = self.game.pot
             self.machine.chips += pot_amount
             self.machine.game_sequence['total_winnings'] += pot_amount
@@ -1413,6 +1426,31 @@ class PokerGUI:
                 self.machine.game_sequence['biggest_pot_won'] = pot_amount
             self.game.pot = 0  # Clear the pot
             self.log_chip_state("Máquina vence o pote")
+        else:  # Empate - Split pot with odd chip rule
+            pot_amount = self.game.pot
+            winners = [self.player, self.machine]
+
+            # Split pot: divide equally, give extra chip(s) to first player
+            split_amount = pot_amount // len(winners)
+            remainder = pot_amount % len(winners)
+
+            for i, winner in enumerate(winners):
+                amount = split_amount
+                # Odd chip rule: extra chip(s) go to first winner (player position)
+                if i == 0 and remainder > 0:
+                    amount += remainder
+
+                winner.chips += amount
+                winner.game_sequence['total_winnings'] += amount
+
+            # Track biggest split pot
+            if split_amount > self.player.game_sequence['biggest_pot_won']:
+                self.player.game_sequence['biggest_pot_won'] = split_amount
+            if split_amount > self.machine.game_sequence['biggest_pot_won']:
+                self.machine.game_sequence['biggest_pot_won'] = split_amount
+
+            self.game.pot = 0  # Clear the pot
+            self.log_chip_state(f"Empate - Pote dividido ({split_amount} cada{f' + {remainder} extra' if remainder > 0 else ''})")
 
         # Log chip counts after pot is awarded
         self.log_message(f"\n💰 Depois do pagamento - Jogador 1: {self.player.chips}, Máquina: {self.machine.chips} chips")

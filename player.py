@@ -128,7 +128,7 @@ class Player:
             # Encontra o melhor kicker
             kickers = sorted([c.value for c in all_cards if c.rank != quad_rank], reverse=True)
             kicker = kickers[0] if kickers else 0
-            return "Quadra", (800, quad_value, quad_value, quad_value, quad_value, kicker)
+            return "Quadra", (800, quad_value, kicker, 0, 0, 0)
 
         # Full House
         threes = sorted([rank for rank, count in rank_count.items() if count == 3],
@@ -143,7 +143,7 @@ class Player:
                 pair_value = Card.rank_values[threes[1]]
             else:
                 pair_value = Card.rank_values[pairs[0]]
-            return "Full House", (700, three_value, three_value, three_value, pair_value, pair_value)
+            return "Full House", (700, three_value, pair_value, 0, 0, 0)
 
         # Flush
         if flush_cards:
@@ -163,7 +163,7 @@ class Player:
             kickers = sorted([c.value for c in all_cards if c.rank != threes[0]], reverse=True)
             k1 = kickers[0] if len(kickers) > 0 else 0
             k2 = kickers[1] if len(kickers) > 1 else 0
-            return "Trinca", (400, three_value, three_value, three_value, k1, k2)
+            return "Trinca", (400, three_value, k1, k2, 0, 0)
 
         # Dois Pares (Two Pair)
         if len(pairs) >= 2:
@@ -173,7 +173,7 @@ class Player:
             kickers = sorted([c.value for c in all_cards if c.rank not in [pairs[0], pairs[1]]],
                            reverse=True)
             kicker = kickers[0] if kickers else 0
-            return "Dois Pares", (300, high_pair, high_pair, low_pair, low_pair, kicker)
+            return "Dois Pares", (300, high_pair, low_pair, kicker, 0, 0)
 
         # Par (One Pair)
         if len(pairs) == 1:
@@ -183,7 +183,7 @@ class Player:
             k1 = kickers[0] if len(kickers) > 0 else 0
             k2 = kickers[1] if len(kickers) > 1 else 0
             k3 = kickers[2] if len(kickers) > 2 else 0
-            return "Par", (200, pair_value, pair_value, k1, k2, k3)
+            return "Par", (200, pair_value, k1, k2, k3, 0)
 
         # Carta Alta (High Card)
         return "Carta Alta", (100, sorted_cards[0].value, sorted_cards[1].value if len(sorted_cards) > 1 else 0,
