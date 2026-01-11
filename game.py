@@ -117,11 +117,20 @@ class Game:
             else:
                 print("\ni️  Nenhuma transferência de fichas necessária.")
         else:
-            # Split pot among winners
+            # Split pot among winners with odd chip rule
             split_amount = self.pot // len(winners)
-            for winner in winners:
-                print(f"\n🏆 {winner.name} vence {split_amount} chips com {best_value[1][0]}!")
-                winner.chips += split_amount
+            remainder = self.pot % len(winners)
+
+            # Award base amount to all winners
+            for i, winner in enumerate(winners):
+                amount = split_amount
+                # Odd chip rule: extra chip(s) go to first winner (best position)
+                if i == 0 and remainder > 0:
+                    amount += remainder
+                    print(f"\n🏆 {winner.name} vence {amount} chips com {best_value[1][0]}! (inclui {remainder} ficha(s) extra)")
+                else:
+                    print(f"\n🏆 {winner.name} vence {amount} chips com {best_value[1][0]}!")
+                winner.chips += amount
 
             # Ensure total chips remain 2000 after split
             for winner in winners:
