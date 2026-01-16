@@ -1,6 +1,10 @@
 # GUI e Imagens
 Pillow>=10.0.0  # Para manipulação de imagens e gráficos de cartas
 
+# Web Framework
+flask>=2.3.0  # Web server para interface web
+flask-cors>=4.0.0  # CORS support para API
+
 # Computação Numérica
 numpy>=1.24.0  # Para cálculos e operações numéricas
 

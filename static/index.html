@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🃏 Texas Hold'em Poker</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="game-header">
+            <h1>🃏 TEXAS HOLD'EM POKER</h1>
+            <div class="game-phase" id="gamePhase">AGUARDANDO</div>
+        </header>
+
+        <!-- Machine Section -->
+        <section class="player-section machine-section">
+            <div class="player-info">
+                <h2>🤖 MÁQUINA</h2>
+                <div class="chip-display">
+                    <span class="chip-icon">💎</span>
+                    <span class="chip-amount" id="machineChips">1000</span>
+                </div>
+            </div>
+            <div class="cards-container">
+                <div class="card-label">CARTAS DA MÁQUINA</div>
+                <div class="hand" id="machineHand">
+                    <div class="card card-back"></div>
+                    <div class="card card-back"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Community Cards Section -->
+        <section class="community-section">
+            <div class="info-bar">
+                <div class="info-box">
+                    <div class="info-label">💰 POTE</div>
+                    <div class="info-value" id="pot">0</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">🎯 APOSTA ATUAL</div>
+                    <div class="info-value" id="currentBet">0</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">🔢 TOTAL</div>
+                    <div class="info-value" id="totalChips">2000</div>
+                </div>
+            </div>
+            
+            <div class="community-label">♠ CARTAS COMUNITÁRIAS ♥</div>
+            <div class="poker-table">
+                <div class="community-cards" id="communityCards">
+                    <div class="card card-placeholder"></div>
+                    <div class="card card-placeholder"></div>
+                    <div class="card card-placeholder"></div>
+                    <div class="card card-placeholder"></div>
+                    <div class="card card-placeholder"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Player Section -->
+        <section class="player-section player-section-main">
+            <div class="player-info">
+                <h2>👤 VOCÊ</h2>
+                <div class="chip-display">
+                    <span class="chip-icon">💎</span>
+                    <span class="chip-amount" id="playerChips">1000</span>
+                </div>
+            </div>
+            <div class="cards-container">
+                <div class="card-label">SUAS CARTAS</div>
+                <div class="hand" id="playerHand">
+                    <div class="card card-placeholder"></div>
+                    <div class="card card-placeholder"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Action Buttons -->
+        <section class="action-section">
+            <div class="hand-strength">
+                <div class="strength-label">🎴 SUA MÃO:</div>
+                <div class="strength-value" id="handStrength">-</div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-call" id="callBtn" onclick="performAction('call')">
+                    ✓ PAGAR
+                </button>
+                <button class="btn btn-raise" id="raiseBtn" onclick="performAction('raise')">
+                    ↑ AUMENTAR
+                </button>
+                <button class="btn btn-fold" id="foldBtn" onclick="performAction('fold')">
+                    ✕ DESISTIR
+                </button>
+            </div>
+        </section>
+
+        <!-- Game Controls -->
+        <section class="controls-section">
+            <button class="btn btn-secondary" onclick="newHand()">🎲 Nova Mão</button>
+            <button class="btn btn-secondary" onclick="newGame()">🔄 Novo Jogo</button>
+        </section>
+
+        <!-- Winner Announcement -->
+        <div class="winner-overlay" id="winnerOverlay" style="display: none;">
+            <div class="winner-card">
+                <h2 id="winnerText">🏆 VENCEDOR</h2>
+                <button class="btn btn-primary" onclick="hideWinner()">Continuar</button>
+            </div>
+        </div>
+
+        <!-- Message Display -->
+        <div class="message-box" id="messageBox" style="display: none;"></div>
+    </div>
+
+    <script src="/static/js/cards.js"></script>
+    <script src="/static/js/game.js"></script>
+</body>
+</html>

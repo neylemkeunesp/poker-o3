@@ -849,3 +849,38 @@ class Game:
 
         self.pot = 0  # Clear the pot after distribution
         print("end_hand called")
+
+if __name__ == "__main__":
+    print("=" * 50)
+    print("🃏 TEXAS HOLD'EM POKER 🃏")
+    print("=" * 50)
+    print("\nEscolha o modo de jogo:")
+    print("1. Jogador vs Máquina")
+    print("2. Máquina vs Máquina (Teste)")
+    print("3. Sair")
+    
+    choice = input("\nSua escolha (1-3): ").strip()
+    
+    if choice == "1":
+        print("\n🎮 Modo: Jogador vs Máquina")
+        print("Iniciando jogo com interface gráfica...")
+        try:
+            from poker_gui import PokerGUI
+            import tkinter as tk
+            root = tk.Tk()
+            app = PokerGUI(root)
+            root.mainloop()
+        except Exception as e:
+            print(f"\n❌ Erro ao iniciar interface gráfica: {e}")
+            print("\nTente executar: python poker_gui.py")
+            
+    elif choice == "2":
+        print("\n🤖 Modo: Máquina vs Máquina")
+        num_games = input("Quantos jogos deseja simular? (padrão: 10): ").strip()
+        num_games = int(num_games) if num_games.isdigit() else 10
+        
+        game = Game()
+        game.play_machine_vs_machine(num_games)
+        
+    else:
+        print("\n👋 Até logo!")
