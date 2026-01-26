@@ -3,120 +3,367 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🃏 Texas Hold'em Poker</title>
+    <title>Texas Hold'em Poker</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/cards.css">
 </head>
 <body>
+    <!-- Toast Notifications Container -->
+    <div id="toast-container"></div>
+
+    <!-- Main Container -->
     <div class="container">
+
         <!-- Header -->
-        <header class="game-header">
-            <h1>🃏 TEXAS HOLD'EM POKER</h1>
-            <div class="game-phase" id="gamePhase">AGUARDANDO</div>
+        <header class="header">
+            <div class="header-content">
+                <h1 class="title">Texas Hold'em Poker</h1>
+                <div class="header-actions">
+                    <button class="btn btn-icon" id="btn-stats" title="Estatísticas (S)">
+                        <span class="icon">📊</span>
+                    </button>
+                    <button class="btn btn-icon" id="btn-help" title="Ajuda (?)">
+                        <span class="icon">?</span>
+                    </button>
+                    <button class="btn btn-secondary" id="btn-reset">
+                        <span>🔄 Resetar Sessão</span>
+                    </button>
+                </div>
+            </div>
         </header>
 
-        <!-- Machine Section -->
-        <section class="player-section machine-section">
-            <div class="player-info">
-                <h2>🤖 MÁQUINA</h2>
-                <div class="chip-display">
-                    <span class="chip-icon">💎</span>
-                    <span class="chip-amount" id="machineChips">1000</span>
-                </div>
-            </div>
-            <div class="cards-container">
-                <div class="card-label">CARTAS DA MÁQUINA</div>
-                <div class="hand" id="machineHand">
-                    <div class="card card-back"></div>
-                    <div class="card card-back"></div>
-                </div>
-            </div>
-        </section>
+        <!-- Main Layout -->
+        <div class="layout-grid">
 
-        <!-- Community Cards Section -->
-        <section class="community-section">
-            <div class="info-bar">
-                <div class="info-box">
-                    <div class="info-label">💰 POTE</div>
-                    <div class="info-value" id="pot">0</div>
-                </div>
-                <div class="info-box">
-                    <div class="info-label">🎯 APOSTA ATUAL</div>
-                    <div class="info-value" id="currentBet">0</div>
-                </div>
-                <div class="info-box">
-                    <div class="info-label">🔢 TOTAL</div>
-                    <div class="info-value" id="totalChips">2000</div>
-                </div>
-            </div>
-            
-            <div class="community-label">♠ CARTAS COMUNITÁRIAS ♥</div>
-            <div class="poker-table">
-                <div class="community-cards" id="communityCards">
-                    <div class="card card-placeholder"></div>
-                    <div class="card card-placeholder"></div>
-                    <div class="card card-placeholder"></div>
-                    <div class="card card-placeholder"></div>
-                    <div class="card card-placeholder"></div>
-                </div>
-            </div>
-        </section>
+            <!-- Game Area -->
+            <div class="game-area">
 
-        <!-- Player Section -->
-        <section class="player-section player-section-main">
-            <div class="player-info">
-                <h2>👤 VOCÊ</h2>
-                <div class="chip-display">
-                    <span class="chip-icon">💎</span>
-                    <span class="chip-amount" id="playerChips">1000</span>
+            <!-- Opponent Area -->
+            <div class="player-area opponent-area">
+                <div class="player-info">
+                    <div class="player-name-section">
+                        <span class="player-name" id="opponent-name">Máquina</span>
+                        <span class="dealer-button" id="opponent-dealer" style="display: none;">D</span>
+                    </div>
+                    <div class="chip-display">
+                        <span class="chip-icon">🪙</span>
+                        <span class="chip-amount" id="opponent-chips">1000</span>
+                    </div>
+                </div>
+                <div class="player-cards" id="opponent-cards">
+                    <!-- Opponent cards will be rendered here -->
+                </div>
+                <div class="player-bet" id="opponent-bet" style="display: none;">
+                    <span class="bet-label">Aposta:</span>
+                    <span class="bet-amount">0</span>
                 </div>
             </div>
-            <div class="cards-container">
-                <div class="card-label">SUAS CARTAS</div>
-                <div class="hand" id="playerHand">
-                    <div class="card card-placeholder"></div>
-                    <div class="card card-placeholder"></div>
+
+            <!-- Table Area -->
+            <div class="table-area">
+                <!-- Phase Indicator -->
+                <div class="phase-indicator">
+                    <div class="phase-item" data-phase="preflop">Pre-Flop</div>
+                    <div class="phase-item" data-phase="flop">Flop</div>
+                    <div class="phase-item" data-phase="turn">Turn</div>
+                    <div class="phase-item" data-phase="river">River</div>
+                    <div class="phase-item" data-phase="showdown">Showdown</div>
+                </div>
+
+                <!-- Community Cards -->
+                <div class="community-cards" id="community-cards">
+                    <div class="cards-placeholder">
+                        <p>Clique em "Nova Mão" para começar</p>
+                    </div>
+                </div>
+
+                <!-- Pot Display -->
+                <div class="pot-display">
+                    <span class="pot-label">Pote</span>
+                    <div class="pot-amount-wrapper">
+                        <span class="chip-icon">🪙</span>
+                        <span class="pot-amount" id="pot-amount">0</span>
+                    </div>
+                </div>
+
+                <!-- Game Message -->
+                <div class="game-message" id="game-message" style="display: none;">
+                    <p></p>
                 </div>
             </div>
-        </section>
 
-        <!-- Action Buttons -->
-        <section class="action-section">
-            <div class="hand-strength">
-                <div class="strength-label">🎴 SUA MÃO:</div>
-                <div class="strength-value" id="handStrength">-</div>
-            </div>
-            <div class="action-buttons">
-                <button class="btn btn-call" id="callBtn" onclick="performAction('call')">
-                    ✓ PAGAR
-                </button>
-                <button class="btn btn-raise" id="raiseBtn" onclick="performAction('raise')">
-                    ↑ AUMENTAR
-                </button>
-                <button class="btn btn-fold" id="foldBtn" onclick="performAction('fold')">
-                    ✕ DESISTIR
-                </button>
-            </div>
-        </section>
+            <!-- Player Area -->
+            <div class="player-area user-area">
+                <div class="player-info">
+                    <div class="player-name-section">
+                        <span class="player-name" id="player-name">Você</span>
+                        <span class="dealer-button" id="player-dealer" style="display: none;">D</span>
+                    </div>
+                    <div class="chip-display">
+                        <span class="chip-icon">🪙</span>
+                        <span class="chip-amount" id="player-chips">1000</span>
+                    </div>
+                </div>
+                <div class="player-cards" id="player-cards">
+                    <!-- Player cards will be rendered here -->
+                </div>
+                <div class="player-bet" id="player-bet" style="display: none;">
+                    <span class="bet-label">Aposta:</span>
+                    <span class="bet-amount">0</span>
+                </div>
 
-        <!-- Game Controls -->
-        <section class="controls-section">
-            <button class="btn btn-secondary" onclick="newHand()">🎲 Nova Mão</button>
-            <button class="btn btn-secondary" onclick="newGame()">🔄 Novo Jogo</button>
-        </section>
-
-        <!-- Winner Announcement -->
-        <div class="winner-overlay" id="winnerOverlay" style="display: none;">
-            <div class="winner-card">
-                <h2 id="winnerText">🏆 VENCEDOR</h2>
-                <button class="btn btn-primary" onclick="hideWinner()">Continuar</button>
+                <!-- Win Probability Display -->
+                <div class="probability-display" id="probability-display" style="display: none;">
+                    <div class="prob-header">
+                        <span class="prob-icon">🎲</span>
+                        <span class="prob-title">Probabilidade de Vitória</span>
+                    </div>
+                    <div class="prob-bar-container">
+                        <div class="prob-bar" id="prob-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="prob-percentage" id="prob-percentage">--%</div>
+                    <div class="prob-details" id="prob-details">Vitórias: -/- simulações</div>
+                </div>
             </div>
+
+            </div>
+
+            <!-- Side Panel -->
+            <aside class="side-panel">
+                <!-- Chip Comparison Dashboard -->
+                <div class="chip-dashboard" id="chip-dashboard">
+                    <div class="dashboard-header">
+                        <span class="dashboard-icon">📊</span>
+                        <h3>Situação das Fichas</h3>
+                    </div>
+
+                    <div class="chip-comparison-bar">
+                        <div class="player-section">
+                            <span class="player-label">VOCÊ</span>
+                            <span class="chip-value" id="dashboard-player-chips">1000</span>
+                        </div>
+
+                        <div class="comparison-visual">
+                            <div class="player-bar" id="player-bar-fill" style="width: 50%;"></div>
+                            <div class="machine-bar" id="machine-bar-fill" style="width: 50%;"></div>
+                        </div>
+
+                        <div class="machine-section">
+                            <span class="chip-value" id="dashboard-machine-chips">1000</span>
+                            <span class="machine-label">MÁQUINA</span>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Total no Jogo</span>
+                            <span class="stat-value" id="total-chips">2000</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Mãos Jogadas</span>
+                            <span class="stat-value" id="hands-played">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Seu Win Rate</span>
+                            <span class="stat-value" id="player-winrate">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Panel -->
+                <div class="action-panel" id="action-panel">
+                    <div class="action-buttons" id="action-buttons">
+                        <button class="btn btn-danger btn-action" id="btn-fold" disabled>
+                            <span>Desistir (F)</span>
+                        </button>
+                        <button class="btn btn-primary btn-action" id="btn-call" disabled>
+                            <span>Pagar (C)</span>
+                            <span class="btn-amount" id="call-amount"></span>
+                        </button>
+                        <button class="btn btn-success btn-action" id="btn-raise" disabled>
+                            <span>Aumentar (R)</span>
+                        </button>
+                    </div>
+
+                    <!-- Raise Control (Initially Hidden) -->
+                    <div class="raise-control" id="raise-control" style="display: none;">
+                        <div class="raise-header">
+                            <h3>Quanto você quer apostar?</h3>
+                            <button class="btn-close" id="btn-close-raise">&times;</button>
+                        </div>
+                        <div class="raise-amount-display">
+                            <span class="chip-icon">🪙</span>
+                            <span id="raise-amount-value">20</span>
+                        </div>
+                        <div class="raise-slider-container">
+                            <input type="range" class="raise-slider" id="raise-slider" min="20" max="1000" value="20" step="10">
+                            <div class="slider-labels">
+                                <span id="slider-min">20</span>
+                                <span id="slider-max">1000</span>
+                            </div>
+                        </div>
+                        <div class="raise-quick-buttons">
+                            <button class="btn btn-quick" data-action="min">Mínimo</button>
+                            <button class="btn btn-quick" data-action="half">1/2 Pote</button>
+                            <button class="btn btn-quick" data-action="pot">Pote</button>
+                            <button class="btn btn-quick" data-action="allin">All-in</button>
+                        </div>
+                        <div class="raise-info">
+                            <p>Fichas restantes: <span id="chips-after-raise">980</span></p>
+                        </div>
+                        <div class="raise-actions">
+                            <button class="btn btn-secondary" id="btn-cancel-raise">Cancelar</button>
+                            <button class="btn btn-success" id="btn-confirm-raise">Confirmar</button>
+                        </div>
+                    </div>
+
+                    <!-- New Hand Button -->
+                    <div class="new-hand-section">
+                        <button class="btn btn-large btn-primary" id="btn-new-hand">
+                            <span>Nova Mão (N)</span>
+                        </button>
+                        <button class="btn btn-large btn-secondary" id="btn-new-game">
+                            <span>🎮 Novo Jogo (G)</span>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
         </div>
 
-        <!-- Message Display -->
-        <div class="message-box" id="messageBox" style="display: none;"></div>
+        <!-- Action History Sidebar -->
+        <aside class="history-sidebar" id="history-sidebar">
+            <div class="history-header">
+                <h3>Histórico de Ações</h3>
+                <button class="btn-toggle" id="btn-toggle-history">
+                    <span>◀</span>
+                </button>
+            </div>
+            <div class="history-content" id="history-content">
+                <p class="history-empty">Nenhuma ação ainda</p>
+            </div>
+        </aside>
+
     </div>
 
-    <script src="/static/js/cards.js"></script>
-    <script src="/static/js/game.js"></script>
+    <!-- Statistics Modal -->
+    <div class="modal" id="stats-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Estatísticas do Jogo</h2>
+                <button class="btn-close" id="btn-close-stats">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="stats-tabs">
+                    <button class="tab-btn active" data-tab="summary">Resumo</button>
+                    <button class="tab-btn" data-tab="history">Histórico</button>
+                    <button class="tab-btn" data-tab="ranking">Ranking</button>
+                </div>
+
+                <!-- Summary Tab -->
+                <div class="tab-content active" id="tab-summary">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Você</h3>
+                            <p class="stat-value" id="player-wins">0</p>
+                            <p class="stat-label">Vitórias</p>
+                            <p class="stat-detail">Win Rate: <span id="player-winrate">0%</span></p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Máquina</h3>
+                            <p class="stat-value" id="machine-wins">0</p>
+                            <p class="stat-label">Vitórias</p>
+                            <p class="stat-detail">Win Rate: <span id="machine-winrate">0%</span></p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Total</h3>
+                            <p class="stat-value" id="total-hands">0</p>
+                            <p class="stat-label">Mãos Jogadas</p>
+                            <p class="stat-detail">Empates: <span id="ties">0</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Tab -->
+                <div class="tab-content" id="tab-history" style="display: none;">
+                    <div class="history-list" id="history-list">
+                        <p>Nenhuma mão jogada ainda</p>
+                    </div>
+                </div>
+
+                <!-- Ranking Tab -->
+                <div class="tab-content" id="tab-ranking" style="display: none;">
+                    <div class="ranking-list" id="ranking-list">
+                        <p>Nenhum ranking disponível</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal" id="help-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Regras do Texas Hold'em</h2>
+                <button class="btn-close" id="btn-close-help">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h3>Como Jogar</h3>
+                    <p>Texas Hold'em é um jogo de poker onde cada jogador recebe 2 cartas privadas e deve formar a melhor mão possível usando 5 cartas das 7 disponíveis (suas 2 cartas + 5 cartas comunitárias).</p>
+                </div>
+
+                <div class="help-section">
+                    <h3>Fases do Jogo</h3>
+                    <ul>
+                        <li><strong>Pre-Flop:</strong> Após receber as 2 cartas iniciais</li>
+                        <li><strong>Flop:</strong> 3 cartas comunitárias são reveladas</li>
+                        <li><strong>Turn:</strong> 4ª carta comunitária é revelada</li>
+                        <li><strong>River:</strong> 5ª carta comunitária é revelada</li>
+                        <li><strong>Showdown:</strong> Revelação das mãos e determinação do vencedor</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Ranking de Mãos (Maior para Menor)</h3>
+                    <ol id="hand-rankings">
+                        <!-- Will be populated dynamically -->
+                    </ol>
+                </div>
+
+                <div class="help-section">
+                    <h3>Blinds e Rake</h3>
+                    <p><strong>Small Blind:</strong> <span id="help-small-blind">10</span> fichas</p>
+                    <p><strong>Big Blind:</strong> <span id="help-big-blind">20</span> fichas</p>
+                    <p><strong>Rake:</strong> <span id="help-rake">10%</span> do pote</p>
+                </div>
+
+                <div class="help-section">
+                    <h3>Estatísticas</h3>
+                    <p><strong>Win Rate:</strong> Percentual de mãos que você venceu. Calculado como: (suas vitórias ÷ total de mãos) × 100%</p>
+                    <p><strong>Exemplo:</strong> Se você ganhou 15 de 50 mãos, seu win rate é 30%</p>
+                    <p><strong>Probabilidade de Vitória:</strong> Chance calculada (Monte Carlo) de ganhar a mão atual, baseada nas suas cartas e cartas da mesa</p>
+                </div>
+
+                <div class="help-section">
+                    <h3>Atalhos de Teclado</h3>
+                    <ul>
+                        <li><strong>C:</strong> Pagar (Call)</li>
+                        <li><strong>R:</strong> Aumentar (Raise)</li>
+                        <li><strong>F:</strong> Desistir (Fold)</li>
+                        <li><strong>N:</strong> Nova Mão</li>
+                        <li><strong>G:</strong> Novo Jogo</li>
+                        <li><strong>S:</strong> Estatísticas</li>
+                        <li><strong>?:</strong> Ajuda</li>
+                        <li><strong>ESC:</strong> Fechar modais</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/app.js"></script>
 </body>
 </html>
